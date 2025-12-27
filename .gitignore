@@ -51,5 +51,6 @@ Thumbs.db
 .env.development
 .env.production
 .env.uat
+.env.*
 sample.js
 package-lock.json
