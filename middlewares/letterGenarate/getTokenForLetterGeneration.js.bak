@@ -1,0 +1,43 @@
+const request = require("request");
+const qs = require("qs");
+const getTokenForLetterGeneration = async (req, res, next) => {
+    try {
+        const fetchTokenLetterGeneration = (callback) => {
+            const options = {
+                method: "POST",
+                url: "https://ihbuat-tcslsp.tcsapps.com/ihbuat001/token",
+                headers: {
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    Authorization:
+                        "Basic S0NrQWZnRU5USkZNYVBGR0FZV1l1d2xVaHBBYTphM3JtcENLOXFkNlNBR0x2ZklUNWZOTWNxbDRh",
+                },
+                data: qs.stringify({
+                    grant_type: "client_credentials",
+                }),
+				useReverseProxy: true,  // Use reverse proxy
+				proxy: 'http://10.130.1.1:8080',  // Custom proxy URL
+            };
+            request(options, function (error, response) {
+                if (error) {
+                    callback(error, null);
+                } else {
+					console.log(response)
+                    const apiResponse = response.body;
+                    callback(null, apiResponse);
+                }
+            });
+        };
+        fetchTokenLetterGeneration((error, apiResponse) => {
+            if (error) {
+                console.log(error);
+            } else {
+                req.apiToken = apiResponse;
+                next();
+            }
+        });
+    } catch (error) {
+        console.log("Error in generating token from server", error);
+        res.status(500).json({ message: "Internal Server Error!!" });
+    }
+};
+module.exports = { getTokenForLetterGeneration };

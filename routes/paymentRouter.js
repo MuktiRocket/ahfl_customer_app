@@ -1,0 +1,13 @@
+const express = require("express");
+const PaytmController = require("../controllers/paytmController");
+const { verifyToken } = require("../middlewares/verifyToken");
+
+const router = express.Router();
+
+router.post("/generateChecksum", verifyToken, PaytmController.createPaytmPayment)
+router.post("/saveTransaction", verifyToken, PaytmController.postResponsePayment)
+router.get("/getTransactionDetails", verifyToken, PaytmController.getTransactionHistory)
+router.get("/getPaymentStatus", PaytmController.getPaymentStatus)
+// router.post("/paytm/callback", PaytmController.handleCallback);
+
+module.exports = [router];

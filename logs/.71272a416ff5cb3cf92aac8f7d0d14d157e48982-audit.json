@@ -1,0 +1,80 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 14
+    },
+    "auditLog": "D:\\int_installation_file\\ahfl-customer-app-node-backend\\logs\\.71272a416ff5cb3cf92aac8f7d0d14d157e48982-audit.json",
+    "files": [
+        {
+            "date": 1765335378654,
+            "name": "D:\\int_installation_file\\ahfl-customer-app-node-backend\\logs\\rejections-2025-12-10.log",
+            "hash": "26d0373c5cc2520220e0c58993a8797dbe1812106f140cfe34fa3d57033221e9"
+        },
+        {
+            "date": 1765440903106,
+            "name": "D:\\int_installation_file\\ahfl-customer-app-node-backend\\logs\\rejections-2025-12-11.log",
+            "hash": "2f0972df38f707bb81f1ef265cbd20166e0cfd0c58170eb76beab8bf35d1be93"
+        },
+        {
+            "date": 1765521438254,
+            "name": "D:\\int_installation_file\\ahfl-customer-app-node-backend\\logs\\rejections-2025-12-12.log",
+            "hash": "3482c1ca1b27663ccf0076b1051556825a9d11a85f3d561cabd6528cd9375b22"
+        },
+        {
+            "date": 1765599542310,
+            "name": "D:\\int_installation_file\\ahfl-customer-app-node-backend\\logs\\rejections-2025-12-13.log",
+            "hash": "fd457b016fbdf6a505d6b75fe2877529a96b49b1279a683ae4851d2ede488ce3"
+        },
+        {
+            "date": 1765819269985,
+            "name": "D:\\int_installation_file\\ahfl-customer-app-node-backend\\logs\\rejections-2025-12-15.log",
+            "hash": "8fff53498dc930756c9fb60637b4b3c0b2e90f9c3c24cc76c9a473859d452d4e"
+        },
+        {
+            "date": 1765868903030,
+            "name": "D:\\int_installation_file\\ahfl-customer-app-node-backend\\logs\\rejections-2025-12-16.log",
+            "hash": "807ff727cde8881546e249224e6555f836d6ce6f434f5128d91b6ec89145fbe5"
+        },
+        {
+            "date": 1765910246198,
+            "name": "D:\\int_installation_file\\ahfl-customer-app-node-backend\\logs\\rejections-2025-12-17.log",
+            "hash": "800d33848c50c8fb2156151ad54f76159a3757786e9e334318303af1ba2c666f"
+        },
+        {
+            "date": 1766028214118,
+            "name": "D:\\int_installation_file\\ahfl-customer-app-node-backend\\logs\\rejections-2025-12-18.log",
+            "hash": "47b4dd656964e9f40f23807a703059606a16281691e3ac2af1106e62aab35bb9"
+        },
+        {
+            "date": 1766109627633,
+            "name": "D:\\int_installation_file\\ahfl-customer-app-node-backend\\logs\\rejections-2025-12-19.log",
+            "hash": "721d37fb1bcf61cceff29a145b1a120b575395b144748846c8a2481d1f477bd6"
+        },
+        {
+            "date": 1766201969740,
+            "name": "D:\\int_installation_file\\ahfl-customer-app-node-backend\\logs\\rejections-2025-12-20.log",
+            "hash": "bb3c7c707ebae9fa314f5917dc03b3f2457b69a2602d18f1d1e6b7b6be9742b4"
+        },
+        {
+            "date": 1766282430033,
+            "name": "D:\\int_installation_file\\ahfl-customer-app-node-backend\\logs\\rejections-2025-12-21.log",
+            "hash": "432b72ce38002069ce4b160984ce7fd65a6096c72b297b472f55f88faec86314"
+        },
+        {
+            "date": 1766368607677,
+            "name": "D:\\int_installation_file\\ahfl-customer-app-node-backend\\logs\\rejections-2025-12-22.log",
+            "hash": "9f663023e0a94b3ad472d725ddea5f4aecee85db0e75524b160b44da6a1ce686"
+        },
+        {
+            "date": 1766455234181,
+            "name": "D:\\int_installation_file\\ahfl-customer-app-node-backend\\logs\\rejections-2025-12-23.log",
+            "hash": "72cb57cde063494ca6fd0aa2bb8a298dd6546ab9492a5695dbd3d982879c7b5b"
+        },
+        {
+            "date": 1766514986705,
+            "name": "D:\\int_installation_file\\ahfl-customer-app-node-backend\\logs\\rejections-2025-12-24.log",
+            "hash": "8276dfe97777da1d0f62b36ee2e231cc965994c41f31f4f782a05222ab37eba6"
+        }
+    ],
+    "hashType": "sha256"
+}

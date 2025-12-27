@@ -1,0 +1,20 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 14
+    },
+    "auditLog": "/home/jaydeep/Desktop/projects/ahfl-customer-app-node-backend/logs/.79fe19548bf3563b2225b17bc5c235fe0a609cdf-audit.json",
+    "files": [
+        {
+            "date": 1766569513273,
+            "name": "/home/jaydeep/Desktop/projects/ahfl-customer-app-node-backend/logs/rejections-2025-12-24.log",
+            "hash": "7962bef74f20c53ad7a8b217e78192a11e6b04b229ce90c7e0f0f6557270c388"
+        },
+        {
+            "date": 1766825867690,
+            "name": "/home/jaydeep/Desktop/projects/ahfl-customer-app-node-backend/logs/rejections-2025-12-27.log",
+            "hash": "6e7fcbaf2c68a67f11a0a4fd9f5ae3f5c33eaf5a823597894872eed46409493d"
+        }
+    ],
+    "hashType": "sha256"
+}
