@@ -16,16 +16,14 @@ const validateCRMRequest = Joi.object({
   probItem: Joi.string().required(),
   probSummary: Joi.string().min(5).required(),
 
-  description: Joi.string().min(10).required(),
+  description: Joi.string(),
 
   source: Joi.string().required(),
   type: Joi.string().required(),
   source_AppId: Joi.string().optional(),
 
   changedEmail: Joi.string().email().optional(),
-  changedMobile: Joi.string()
-    .pattern(/^[6-9]\d{9}$/)
-    .optional(),
+  changedMobile: Joi.string().empty("").optional(),
 });
 
 module.exports = validateCRMRequest;

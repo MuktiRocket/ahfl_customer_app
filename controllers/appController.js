@@ -7,6 +7,13 @@ const { default: axios } = require("axios");
 const request = require("request");
 const FormData = require("form-data");
 const qs = require("qs");
+const {
+  saveCRMRequestData,
+  updateCRMRequestDataByTicketId,
+} = require("../models/crmDataModel");
+
+const PROB_SUMMARY_FOR_EMAIL = "Updation/Rectification of Email ID";
+const PROB_SUMMARY_FOR_MOBILE = "Updation/Rectification of Mobile number";
 
 module.exports = {
   getCRMRequestData: async (req, res) => {
@@ -31,24 +38,16 @@ module.exports = {
         changedMobile,
       } = req.body;
       let prodDesc = description;
-      console.log(999999, prodDesc, probSummary, changedEmail, changedMobile);
-      if (
-        probSummary === "Updation/Rectification of Email ID" &&
-        changedEmail
-      ) {
+
+      if (probSummary === PROB_SUMMARY_FOR_EMAIL && changedEmail) {
         contactEmailId = changedEmail;
         prodDesc = changedEmail;
-        console.log(5555555, contactEmailId, prodDesc);
       }
-      if (
-        probSummary === "Updation/Rectification of Mobile number" &&
-        changedMobile
-      ) {
+      if (probSummary === PROB_SUMMARY_FOR_MOBILE && changedMobile) {
         contactMobileNo = changedMobile;
         prodDesc = changedMobile;
-        console.log(666666, contactMobileNo, prodDesc);
       }
-      console.log(213213212313, description, prodDesc);
+
       let requestData = {
         lastName,
         clientId,
@@ -66,15 +65,16 @@ module.exports = {
         changedMobile,
       };
 
-      console.log(111111, requestData);
+      const requestId = await saveCRMRequestData(requestData);
+
+      console.log(updatedId);
       const result = await apiFetcher({
         url: thirdPartyApi.getCRMToken.endpoint,
         method: thirdPartyApi.getCRMToken.method,
         headers: thirdPartyApi.getCRMToken.headers,
-        useReverseProxy: true, // Use reverse proxy
-        proxy: "http://10.130.1.1:8080", // Custom proxy URL
+        useReverseProxy: true,
+        proxy: "http://10.130.1.1:8080",
       });
-      //console.log({ result })
 
       if (!result || result?.Status !== "Success") {
         return res.status(401).json({
@@ -86,7 +86,6 @@ module.exports = {
 
       let formData = new FormData();
       formData.append("casebody", JSON.stringify(requestData));
-      //console.log({ formData })
 
       const crmData = await apiFetcher({
         url: thirdPartyApi.getCRMDetails.endpoint,
@@ -96,8 +95,8 @@ module.exports = {
           token_id: result?.token_id,
         },
         data: formData,
-        useReverseProxy: true, // Use reverse proxy
-        proxy: "http://10.130.1.1:8080", // Custom proxy URL
+        useReverseProxy: true,
+        proxy: "http://10.130.1.1:8080",
       });
 
       if (!crmData || crmData?.response_type === "FAILURE") {
@@ -116,6 +115,12 @@ module.exports = {
           ticketId = resposeStatus.split(" ")[2];
           //console.log({ ticketId });
         }
+
+        const updatedId = await updateCRMRequestDataByTicketId({
+          ticketId,
+          id: requestId,
+        });
+
         return responseSender(
           res,
           200,
@@ -160,18 +165,18 @@ module.exports = {
       const access_token = result?.access_token;
 
       /*const proxy = "http://10.130.1.1:8080";
-			const agent = new HttpsProxyAgent(proxy);
-			
-			const letterData = await axios.post(thirdPartyApi.getGeneratedToken.endpoint, {
-				headers: {
+      const agent = new HttpsProxyAgent(proxy);
+    	
+      const letterData = await axios.post(thirdPartyApi.getGeneratedToken.endpoint, {
+        headers: {
                     'Content-Type' : 'application/json',
                     'Authorization' : `Bearer ${access_token}`,
-					 Accept: 'application/pdf',
+           Accept: 'application/pdf',
                 },
-				responseType: 'arraybuffer',
-				httpsAgent: agent,
-				timeout: 10000
-			});*/
+        responseType: 'arraybuffer',
+        httpsAgent: agent,
+        timeout: 10000
+      });*/
 
       /*const letterData = await apiFetcher({
                 url: thirdPartyApi.getGeneratedToken.endpoint,
