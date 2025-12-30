@@ -270,7 +270,7 @@ router.post(
 
 router.post(
   "/crmRequest",
-  // verifyToken,
+  verifyToken,
   validate(validateCRMRequest),
   appController.getCRMRequestData
 );

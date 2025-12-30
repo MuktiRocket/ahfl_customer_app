@@ -1,108 +1,134 @@
-require("dotenv").config()
+require("dotenv").config();
+
+const methods = {
+    POST: "post",
+    GET: "get",
+    PUT: "put",
+    PATCH: "patch"
+};
+
+const isLocalAndUAT = ["local"].some((name) => process.env.NODE_ENV === name);
+//credentials
+const thirdPartyApiToken = isLocalAndUAT ? process.env.UAT_THIRD_PARTY_API_TOKEN : process.env.THIRD_PARTY_API_TOKEN;
+const CRMTokenUsername = isLocalAndUAT ? process.env.UAT_CRM_TOKEN_USERNAME : process.env.CRM_TOKEN_USERNAME;
+const CRMTokenPassword = isLocalAndUAT ? process.env.UAT_CRM_TOKEN_PASSWORD : process.env.CRM_TOKEN_PASSWORD;
+const CRMTokenIdentifier = isLocalAndUAT ? process.env.UAT_CRM_TOKEN_IDENTIFIER : process.env.CRM_TOKEN_IDENTIFIER;
+const grantTypeLetterGeneration = isLocalAndUAT ? process.env.UAT_GRANT_TYPE_LETTER_GENERATION : process.env.GRANT_TYPE_LETTER_GENERATION;
+const letterApiUsername = isLocalAndUAT ? process.env.Third_Party_LetterApi_Username : process.env.Third_Party_LetterApi_Username;
+const letterApiPassword = isLocalAndUAT ? process.env.Third_Party_LetterApi_Password : process.env.Third_Party_LetterApi_Password;
+const letterApiToken = isLocalAndUAT ? process.env.UAT_Third_Party_LetterApi_Token : process.env.Third_Party_LetterApi_Token;
+//apis
+const customerDetailsUsingMobile = isLocalAndUAT ? process.env.UAT_THIRD_PARTY_API_CUSTOMER_DETAILS_USING_MOBILE : process.env.THIRD_PARTY_API_CUSTOMER_DETAILS_USING_MOBILE;
+const customerDetailsUsingDOB = isLocalAndUAT ? process.env.UAT_THIRD_PARTY_API_CUSTOMER_DETAILS_USING_DOB : process.env.THIRD_PARTY_API_CUSTOMER_DETAILS_USING_DOB;
+const loanOutstanding = isLocalAndUAT ? process.env.UAT_THIRD_PARTY_API_LOAN_OUTSTANDING : process.env.THIRD_PARTY_API_LOAN_OUTSTANDING;
+const loanApplicationStatus = isLocalAndUAT ? process.env.UAT_THIRD_PARTY_API_LOAN_APPLICATION_STATUS : process.env.THIRD_PARTY_API_LOAN_APPLICATION_STATUS;
+const applyLoanLeadBank = isLocalAndUAT ? process.env.UAT_THIRD_PARTY_API_APPLY_LOAN_LEAD_BANK : process.env.THIRD_PARTY_API_APPLY_LOAN_LEAD_BANK;
+const CRMToken = isLocalAndUAT ? process.env.UAT_THIRD_PARTY_API_CRM_TOKEN : process.env.THIRD_PARTY_API_CRM_TOKEN;
+const CRMDetails = isLocalAndUAT ? process.env.UAT_THIRD_PARTY_API_CRM_DETAILS : process.env.THIRD_PARTY_API_CRM_DETAILS;
+const tokenForLetterGeneration = isLocalAndUAT ? process.env.UAT_THIRD_PARTY_API_LETTER_GENERATION_TOKEN : process.env.THIRD_PARTY_API_LETTER_GENERATION_TOKEN;
+const generatedToken = isLocalAndUAT ? process.env.UAT_THIRD_PARTY_API_LETTER_GENERATION : process.env.THIRD_PARTY_API_LETTER_GENERATION;
+const postEMIPayment = isLocalAndUAT ? process.env.UAT_THIRD_PARTY_API_POST_EMI_PAYMENT : process.env.THIRD_PARTY_API_POST_EMI_PAYMENT;
+
+//Authorization for letter generation
+let authorization = "";
+if (isLocalAndUAT)
+    authorization = 'Basic ' + Buffer.from(letterApiToken);
+else
+    authorization = 'Basic ' + Buffer.from(`${letterApiUsername}:${letterApiPassword}`).toString('base64');
+
 
 module.exports = {
-
     getCustomerDetailsUsingMobile: {
-        //endpoint: "https://amw.ahflonline.com/intCust/1.0/getCustDet",
-		endpoint: process.env.THIRD_PARTY_API_CUSTOMER_DETAILS_USING_MOBILE,
-        method: "post",
+        endpoint: customerDetailsUsingMobile,
+        method: methods.POST,
         headers: {
             "Content-Type": "application/json",
-            Authorization: 'Bearer ' + process.env["Third_Party_Api_Token"],
+            Authorization: `Bearer ${thirdPartyApiToken}`,
         }
     },
 
     getCustomerDetailsUsingDob: {
-        //endpoint: "https://amw.ahflonline.com/lmsApplicationCustomerApi/1.0.0/lmsApplicationCustomerApi",
-		endpoint: process.env.THIRD_PARTY_API_CUSTOMER_DETAILS_USING_DOB,
-        method: "post",
+        endpoint: customerDetailsUsingDOB,
+        method: methods.POST,
         headers: {
             "Content-Type": "application/json",
-            Authorization: 'Bearer ' + process.env["Third_Party_Api_Token"],
+            Authorization: `Bearer ${thirdPartyApiToken}`,
         }
     },
 
     getLoanOutstanding: {
-        //endpoint: "https://amw.ahflonline.com/custdue/1.0/ahfl_outstanding",
-		endpoint: process.env.THIRD_PARTY_API_LOAN_OUTSTANDING,
-        method: 'post',
+        endpoint: loanOutstanding,
+        method: methods.POST,
         headers: {
-            Authorization: 'Bearer ' + process.env["Third_Party_Api_Token"],
-            "Content-Type": 'application/json',
+            Authorization: `Bearer ${thirdPartyApiToken}`,
+            "Content-Type": "application/json",
         }
     },
 
     getLoanApplicationStatus: {
-        //endpoint: "https://amw.ahflonline.com/lmsApplicationCustomerStatus/1.0.0/lmsApplicationCustomerStatus",
-		endpoint: process.env.THIRD_PARTY_API_LOAN_APPLICATION_STATUS,
+        endpoint: loanApplicationStatus,
         method: 'post',
         headers: {
             "Content-Type": "application/json",
-            Authorization: 'Bearer ' + process.env["Third_Party_Api_Token"],
+            Authorization: `Bearer ${thirdPartyApiToken}`,
         }
     },
 
     getApplyLoanLeadBank: {
-        //endpoint: "https://amw.ahflonline.com/lead/1.0/LeadBank",
-		endpoint: process.env.THIRD_PARTY_API_APPLY_LOAN_LEAD_BANK,
-        method: "post",
+        endpoint: applyLoanLeadBank,
+        method: methods.POST,
         headers: {
             "Content-Type": "application/json",
-            Authorization: 'Bearer ' + process.env["Third_Party_Api_Token"],
+            Authorization: `Bearer ${thirdPartyApiToken}`,
         }
     },
 
     getCRMToken: {
-        //endpoint: "https://g21m17.tcsion.com/CRM/crmrest/clientCom/generateToken",
-		endpoint: process.env.THIRD_PARTY_API_CRM_TOKEN,
-        method: "post",
+        endpoint: CRMToken,
+        method: methods.POST,
         headers: {
             'Content-type': 'application/json',
-            user_name: process.env.CRM_TOKEN_USERNAME,
-            password: process.env.CRM_TOKEN_PASSWORD,
-            identifier: process.env.CRM_TOKEN_IDENTIFIER,
+            user_name: CRMTokenUsername,
+            password: CRMTokenPassword,
+            identifier: CRMTokenIdentifier,
         },
     },
 
     getCRMDetails: {
-        //endpoint: "https://g21m17.tcsion.com/CRM/crmrest/crmGetCase/casefileuploadsknew",
-		endpoint: process.env.THIRD_PARTY_API_CRM_DETAILS,
-        method: "post",
+        endpoint: CRMDetails,
+        method: methods.POST,
         headers: {
             "Content-Type": "multipart/form-data",
-            identifier: process.env.CRM_TOKEN_IDENTIFIER,
+            identifier: CRMTokenIdentifier,
         },
     },
 
     getTokenForLetterGeneration: {
-        //endpoint: "https://ihbmum-tcslsp.tcsapps.com/ihbmum000/token",
-		endpoint: process.env.THIRD_PARTY_API_LETTER_GENERATION_TOKEN,
-        method: "post",
+        endpoint: tokenForLetterGeneration,
+        method: methods.POST,
         headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            Authorization: 'Basic ' + Buffer.from(`${process.env.Third_Party_LetterApi_Username}:${process.env.Third_Party_LetterApi_Password}`).toString('base64'),
+            "Content-Type": "application/x-www-form-urlencoded",
+            Authorization: authorization,
         },
         data: {
-            grant_type: process.env.GRANT_TYPE_LETTER_GENERATION,
+            grant_type: grantTypeLetterGeneration,
         }
     },
 
     getGeneratedToken: {
-        //endpoint: "https://ihbmum-tcslsp.tcsapps.com/ihbmum000/ReportGeneration/1.0/LetterGeneration",
-		endpoint: process.env.THIRD_PARTY_API_LETTER_GENERATION,
-        method: "post",
+        endpoint: generatedToken,
+        method: methods.POST,
         headers: {
             "Content-Type": "application/json",
         },
     },
 
     postEmiPayment: {
-        //endpoint: "https://amw.ahflonline.com/paypost/1.0/ahfl_post",0
-		endpoint: process.env.THIRD_PARTY_API_POST_EMI_PAYMENT,
-        method: "post",
+        endpoint: postEMIPayment,
+        method: methods.POST,
         headers: {
             "Content-Type": "application/json",
-            Authorization: 'Bearer ' + process.env["Third_Party_Api_Token"],
+            Authorization: `Bearer ${thirdPartyApiToken}`,
         }
     }
 };
