@@ -11,6 +11,7 @@ const {
   saveCRMRequestData,
   updateCRMRequestDataByTicketId,
 } = require("../models/crmDataModel");
+const { sendRequest } = require("../utils/thirdPartyApiService");
 
 const PROB_SUMMARY_FOR_EMAIL = "Updation/Rectification of Email ID";
 const PROB_SUMMARY_FOR_MOBILE = "Updation/Rectification of Mobile number";
@@ -20,125 +21,64 @@ module.exports = {
     try {
       const lang = req.headers["language"] || req.headers["Language"];
 
-      let {
-        lastName,
-        clientId,
-        contactEmailId,
-        probCategory,
-        contactMobileNo,
-        description,
-        source,
-        type,
-        probType,
-        probSummary,
-        firstName,
-        source_AppId,
-        probItem,
-        changedEmail,
-        changedMobile,
-      } = req.body;
+      let { lastName, clientId, contactEmailId, probCategory, contactMobileNo, description, source, type, probType, probSummary, firstName, source_AppId, probItem, changedEmail, changedMobile } = req.body;
+
       let prodDesc = description;
 
       if (probSummary === PROB_SUMMARY_FOR_EMAIL && changedEmail) {
         contactEmailId = changedEmail;
         prodDesc = changedEmail;
       }
+
       if (probSummary === PROB_SUMMARY_FOR_MOBILE && changedMobile) {
         contactMobileNo = changedMobile;
         prodDesc = changedMobile;
       }
 
-      let requestData = {
-        lastName,
-        clientId,
-        contactEmailId,
-        probCategory,
-        contactMobileNo,
-        description: prodDesc,
-        source,
-        type,
-        probType,
-        probSummary,
-        firstName,
-        source_AppId,
-        probItem,
-        changedMobile,
-      };
+      const requestData = { lastName, clientId, contactEmailId, probCategory, contactMobileNo, description: prodDesc, source, type, probType, probSummary, firstName, source_AppId, probItem, changedMobile };
 
       const requestId = await saveCRMRequestData(requestData);
 
-      console.log(updatedId);
-      const result = await apiFetcher({
-        url: thirdPartyApi.getCRMToken.endpoint,
+      // ---------- GET CRM TOKEN ----------
+      const tokenPayload = {
         method: thirdPartyApi.getCRMToken.method,
+        url: thirdPartyApi.getCRMToken.endpoint,
         headers: thirdPartyApi.getCRMToken.headers,
-        useReverseProxy: true,
-        proxy: "http://10.130.1.1:8080",
-      });
+      };
+      const tokenResult = await sendRequest(tokenPayload);
 
-      if (!result || result?.Status !== "Success") {
-        return res.status(401).json({
-          success: false,
-          status: 401,
-          message: "Error in getting token id from third party api",
-        });
-      }
+      if (!tokenResult || tokenResult?.Status !== "Success")
+        return res.status(401).json({ success: false, status: 401, message: "Error in getting token id from third party api" });
 
-      let formData = new FormData();
+      // ---------- SEND CRM REQUEST ----------
+      const formData = new FormData();
       formData.append("casebody", JSON.stringify(requestData));
 
-      const crmData = await apiFetcher({
-        url: thirdPartyApi.getCRMDetails.endpoint,
+      const crmRequestPayload = {
         method: thirdPartyApi.getCRMDetails.method,
-        headers: {
-          ...thirdPartyApi.getCRMDetails.headers,
-          token_id: result?.token_id,
-        },
+        url: thirdPartyApi.getCRMDetails.endpoint,
+        headers: { ...thirdPartyApi.getCRMDetails.headers, token_id: tokenResult?.token_id },
         data: formData,
-        useReverseProxy: true,
-        proxy: "http://10.130.1.1:8080",
-      });
+      };
+      const crmData = await sendRequest(crmRequestPayload);
 
-      if (!crmData || crmData?.response_type === "FAILURE") {
-        return res.status(200).json({
-          success: true,
-          status: 200,
-          message: "Error in fetching crm request",
-          data: {
-            crmData,
-          },
-        });
-      } else {
-        const resposeStatus = crmData?.respose_status;
-        let ticketId;
-        if (resposeStatus) {
-          ticketId = resposeStatus.split(" ")[2];
-          //console.log({ ticketId });
-        }
+      if (!crmData || crmData?.response_type === "FAILURE")
+        return res.status(200).json({ success: true, status: 200, message: "Error in fetching crm request", data: { crmData }, });
 
-        const updatedId = await updateCRMRequestDataByTicketId({
-          ticketId,
-          id: requestId,
-        });
+      const responseStatus = crmData?.respose_status;
+      const ticketId = responseStatus ? responseStatus.split(" ")[2] : undefined;
 
-        return responseSender(
-          res,
-          200,
-          responseMessage.crmSuccessMessage.description[lang],
-          true,
-          { crmData, ticketId }
-        );
-      }
-    } catch (error) {
-      //console.log("Error is:", error)
-      return responseSender(
-        res,
-        500,
-        "Internal server error while fetching CRM request",
-        false
+      await updateCRMRequestDataByTicketId({ ticketId, id: requestId });
+
+      return responseSender(res, 200, responseMessage.crmSuccessMessage.description[lang], true, { crmData, ticketId }
       );
+
+    } catch (error) {
+      console.log("Error is:", error);
+      return responseSender(res, 500, "Internal server error while fetching CRM request", false);
     }
   },
+
 
   getLetterGenerationData: async (req, res) => {
     try {
@@ -257,7 +197,7 @@ module.exports = {
                 return responseSender(res, responseMessage.errorPdfGeneration.statusCode, responseMessage.errorPdfGeneration.description[lang], false, letterData)
             }*/
     } catch (error) {
-      // console.log("Error is:", error)
+      console.log("Error is:", error)
       return res.status(500).json({
         success: false,
         status: 500,
