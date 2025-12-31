@@ -2,8 +2,6 @@ const apiFetcher = require("../utils/apiFetcher");
 const responseMessage = require("../utils/responseMessage");
 const responseSender = require("../utils/responseSender");
 const thirdPartyApi = require("../utils/thirdPartyApi");
-const { HttpsProxyAgent } = require("https-proxy-agent");
-const { default: axios } = require("axios");
 const request = require("request");
 const FormData = require("form-data");
 const qs = require("qs");
@@ -12,6 +10,8 @@ const {
   updateCRMRequestDataByTicketId,
 } = require("../models/crmDataModel");
 const { sendRequest } = require("../utils/thirdPartyApiService");
+const { updateApplyLoanLeadId } = require("../models/userModel");
+const { logger } = require("../utils/logger");
 
 const PROB_SUMMARY_FOR_EMAIL = "Updation/Rectification of Email ID";
 const PROB_SUMMARY_FOR_MOBILE = "Updation/Rectification of Mobile number";
@@ -78,7 +78,6 @@ module.exports = {
       return responseSender(res, 500, "Internal server error while fetching CRM request", false);
     }
   },
-
 
   getLetterGenerationData: async (req, res) => {
     try {
@@ -304,4 +303,21 @@ module.exports = {
       });
     }
   },
+
+  applyLoan: async (req, res) => {
+    try {
+      const applyLoanData = req.apiData;
+      const loanId = req.loanId;
+
+      if (applyLoanData?.lead_id && applyLoanData?.status_code === "0001") {
+        await updateApplyLoanLeadId({ id: loanId, lead_id: pplyLoanData.lead_id })
+        return res.status(200).json({ success: true, status: 200, message: applyLoanData.message, data: { lead_id: applyLoanData.lead_id }, });
+      }
+
+      return res.status(200).json({ success: false, status: 200, message: applyLoanData?.message || "Something went wrong", data: { lead_id: applyLoanData?.leadId }, });
+    } catch (error) {
+      logger.error(error);
+    }
+  }
+
 };

@@ -140,36 +140,7 @@ router.get("/getCustomerDetails", verifyToken, async (req, res) => {
 
 // router.get("/getCustomerDetails", verifyToken, appController.getCustomerDetails)
 
-router.post("/applyLoan", createApplyLoanLeadBank, (req, res) => {
-  console.log(555555, req.apiData);
-  // const applyLoanData = JSON.parse(req.apiData);
-  const applyLoanData = req.apiData;
-  console.log(333333, applyLoanData);
-  if (
-    applyLoanData &&
-    applyLoanData.lead_id &&
-    applyLoanData.status_code === "0001"
-  ) {
-    const leadId = applyLoanData.lead_id;
-    return res.status(200).json({
-      success: true,
-      status: 200,
-      message: applyLoanData.message,
-      data: {
-        lead_id: leadId,
-      },
-    });
-  } else {
-    return res.status(200).json({
-      success: false,
-      status: 200,
-      message: applyLoanData?.message || "Something went wrong",
-      data: {
-        lead_id: applyLoanData?.leadId,
-      },
-    });
-  }
-});
+router.post("/applyLoan", createApplyLoanLeadBank, appController.applyLoan);
 
 router.post(
   "/applyTopUpLoan",
@@ -262,18 +233,9 @@ router.get("/loanApplicationStatus", async (req, res) => {
 // }
 // );
 
-router.post(
-  "/letterGeneration",
-  verifyToken,
-  appController.getLetterGenerationData
-);
+router.post("/letterGeneration", verifyToken, appController.getLetterGenerationData);
 
-router.post(
-  "/crmRequest",
-  verifyToken,
-  validate(validateCRMRequest),
-  appController.getCRMRequestData
-);
+router.post("/crmRequest", verifyToken, validate(validateCRMRequest), appController.getCRMRequestData);
 
 router.post("/transaction", verifyToken, async (req, res) => {
   try {

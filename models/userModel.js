@@ -304,4 +304,78 @@ async function getCustomerDetails(uid) {
   // const customerNumber = JSON.parse(customer_data)[0].customerNumber;
 }
 
-module.exports = { saveUserData, saveTransactionDetails, saveRequestPaymentDetails, saveResponsePaymentDetails, getCustomerDetails, insertPaymentDetails, updatePaymentDetailsByOrderId };
+async function saveApplyLoanData(payload) {
+  try {
+
+    const { firstName, lastName, clientId, contactEmailId, probCategory, contactMobileNo, description, source, type, probType, probSummary, probItem, source_AppId, lead_id } = payload;
+
+    const insertQuery = `
+      INSERT INTO apply_loan_data (
+        firstName,
+        lastName,
+        clientId,
+        contactEmailId,
+        probCategory,
+        contactMobileNo,
+        description,
+        source,
+        type,
+        probType,
+        probSummary,
+        probItem,
+        source_AppId,
+        created_at,
+        updated_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+    `;
+
+    const insertValues = [
+      firstName || null,
+      lastName || null,
+      clientId || null,
+      contactEmailId || null,
+      probCategory || null,
+      contactMobileNo || null,
+      description || null,
+      source || null,
+      type || null,
+      probType || null,
+      probSummary || null,
+      probItem || null,
+      source_AppId || null,
+    ];
+
+    const [result] = await pool.promise().execute(insertQuery, insertValues);
+
+    return result.insertId;
+
+  } catch (error) {
+    console.error("Error saving apply loan data:", error);
+    throw error;
+  }
+}
+
+async function updateApplyLoanLeadId({ id, lead_id }) {
+  try {
+    const updateQuery = `
+      UPDATE apply_loan_data
+      SET lead_id = ?, updated_at = NOW()
+      WHERE id = ?
+    `;
+
+    const updateValues = [lead_id || null, id];
+
+    await pool.promise().execute(updateQuery, updateValues);
+
+    return true;
+
+  } catch (error) {
+    console.error("Error updating apply loan lead_id:", error);
+    throw error;
+  }
+}
+
+
+
+module.exports = { saveUserData, saveTransactionDetails, saveRequestPaymentDetails, saveResponsePaymentDetails, getCustomerDetails, insertPaymentDetails, updatePaymentDetailsByOrderId, saveApplyLoanData, updateApplyLoanLeadId };
