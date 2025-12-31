@@ -7,393 +7,137 @@ const { sendOTP } = require("../utils/sendOtpViaGupshup");
 const apiFetcher = require("../utils/apiFetcher");
 const thirdPartyApi = require("../utils/thirdPartyApi");
 const request = require("request");
+const { sendRequest } = require("../utils/thirdPartyApiService");
+const { logger } = require("../utils/logger");
 
 module.exports = {
   otpLogin: async (req, res) => {
     const { mobileNumber, isDeveloped } = req.body;
 
     try {
-      if (!mobileNumber) {
-        return res.status(400).json({
-          success: false,
-          status: 400,
-          message: "Mobile number is required",
-          data: {},
-        });
-      }
+      if (!mobileNumber)
+        return res.status(400).json({ success: false, status: 400, message: "Mobile number is required", data: {} });
 
-      const requesData = JSON.stringify({
-        mobileNo: mobileNumber,
-      });
-      console.log({
-        url: thirdPartyApi.getCustomerDetailsUsingMobile.endpoint,
+      const payload = {
         method: thirdPartyApi.getCustomerDetailsUsingMobile.method,
-        headers: thirdPartyApi.getCustomerDetailsUsingMobile.headers,
-        data: requesData,
-      });
-      const result = await apiFetcher({
         url: thirdPartyApi.getCustomerDetailsUsingMobile.endpoint,
-        method: thirdPartyApi.getCustomerDetailsUsingMobile.method,
         headers: thirdPartyApi.getCustomerDetailsUsingMobile.headers,
-        data: requesData,
-      });
-      console.log(result);
-      if (!result || result?.Message) {
-        console.log("This issue occurs from third party APIs", result);
-        return res.status(200).json({
-          success: false,
-          status: 200,
-          message: result?.Message || "Invalid Mobile Number",
-        });
+        data: JSON.stringify({ mobileNo: mobileNumber }),
+      };
+      const result = await sendRequest(payload);
+
+      if (!result || result?.Message)
+        return res.status(200).json({ success: false, status: 200, message: result?.Message || "Invalid Mobile Number" });
+
+      const customerDataArray = Array.isArray(result?.customerDetails) ? result.customerDetails : [result?.customerDetails];
+
+      if (!customerDataArray?.length)
+        return res.status(200).json({ success: false, status: 200, message: "Invalid User! Not registered yet", data: {} });
+
+      const { applicantMobileNo, customerNumber, loanAccountNumber } = customerDataArray[0];
+
+      if (!applicantMobileNo || !customerNumber)
+        return res.status(401).json({ success: false, status: 401, message: "User not exists", data: {} });
+
+      const isBypass = mobileNumber == process.env.BYPASS_MOBILE
+      const otp = isBypass ? process.env.TESTING_OTP_UAT : generateRandomOtp();
+
+      const [[existingUser]] = await pool
+        .promise()
+        .execute(`SELECT uid FROM user_data WHERE mobile_number = ?`, [applicantMobileNo]);
+
+      const uid = existingUser?.uid || uuid.v4();
+
+      // ---------- BYPASS OTP ----------
+      if (isBypass) {
+        await saveUserData({ mobileNumber, otp, customerDataArray, uid, loanAccountNumber });
+
+        const otpToken = jwt.sign({ uid }, process.env.SECRET_KEY, { expiresIn: "5m" });
+
+        return res.status(200).json({ success: true, status: 200, message: "OTP sent successfully!!", data: { token: otpToken, otp, mobileNumber }, });
       }
-      //console.log(123456)
-      let customerDataArray = [];
-      const customerData = result;
-      console.log(customerData?.customerDetails);
-      /*customerData?.customerDetails?.forEach((details) => {
-				//console.log("4646466", details)
-				if(!details?.crmClientIDs){
-					console.log('clientId is null for loan account number = '+ details?.loanAccountNumber)
-				}else{
-					console.log('clientID = ', details?.crmClientID)
-				}
-			});*/
-      //console.log(124578)
-      // Checking response to be in array or not
-      if (!Array.isArray(customerData?.customerDetails)) {
-        customerDataArray.push(customerData?.customerDetails);
-      } else {
-        customerDataArray = customerData?.customerDetails;
-      }
 
-      // checking customerdatails exists or not
-      if (customerDataArray && customerDataArray.length > 0) {
-        const { applicantMobileNo, customerNumber, loanAccountNumber } =
-          customerDataArray[0];
+      // ---------- NORMAL OTP ----------
+      const otpResponse = await sendOTP(applicantMobileNo, otp);
 
-        // console.log({ applicantMobileNo, customerNumber })
+      if (!otpResponse.success)
+        return res.status(500).json({ success: false, status: 500, message: "Failed to send OTP", data: {} });
 
-        if (applicantMobileNo && customerNumber) {
-          // const otp = generateRandomOtp();
-          // bypass otp
-          const otp =
-            mobileNumber == process.env.BYPASS_MOBILE
-              ? process.env.TESTING_OTP_UAT
-              : generateRandomOtp();
+      await saveUserData({ mobileNumber, otp, customerDataArray, uid, loanAccountNumber, dob: null });
 
-          //generating random unique id
-          const query = `SELECT * FROM user_data WHERE mobile_number = ?`;
-          const [userDataRows] = await pool
-            .promise()
-            .execute(query, [applicantMobileNo]);
-          let uid;
-          if (userDataRows.length === 0) {
-            //console.log(userDataRows)
-            uid = uuid.v4();
-          } else {
-            uid = userDataRows[0].uid;
-          }
+      const otpToken = jwt.sign({ uid }, process.env.SECRET_KEY, { expiresIn: "5m" });
 
-          if (mobileNumber == process.env.BYPASS_MOBILE) {
-            //bypass otp sender
-            await saveUserData({
-              mobileNumber,
-              otp,
-              customerDataArray,
-              uid,
-              loanAccountNumber,
-            });
-            const otpToken = jwt.sign({ uid }, process.env.SECRET_KEY, {
-              expiresIn: "5m",
-            });
+      return res.status(200).json({ success: true, status: 200, message: "OTP sent successfully!!", data: { token: otpToken, otp }, });
 
-            res.json({
-              success: true,
-              status: 200,
-              message: "OTP sent successfully!!",
-              data: {
-                token: otpToken,
-                otp: otp,
-                mobileNumber: mobileNumber,
-              },
-            });
-          } else {
-            const otpResponse = await sendOTP(applicantMobileNo, otp);
-            //if (await sendOTP(applicantMobileNo, otp)) {
-            if (otpResponse.success) {
-              //await saveUserData({ applicantMobileNo, otp, customerDataArray, uid, loanAccountNumber, dob })
-
-              const payload = {
-                mobileNumber: mobileNumber,
-                otp: otp,
-                customerDataArray: customerDataArray,
-                uid: uid,
-                loanAccountNumber: loanAccountNumber,
-                dob: null,
-              };
-              await saveUserData(payload);
-
-              const otpToken = jwt.sign({ uid }, process.env.SECRET_KEY, {
-                expiresIn: "5m",
-              });
-
-              res.json({
-                success: true,
-                status: 200,
-                message: "OTP sent successfully!!",
-                data: { token: otpToken, otp: otp },
-              });
-            } else {
-              res
-                .status(500)
-                .json({
-                  success: false,
-                  status: 500,
-                  message: "Failed to send OTP",
-                  data: {},
-                });
-            }
-          }
-        } else {
-          res
-            .status(401)
-            .json({
-              success: false,
-              status: 401,
-              message: "User not exists",
-              data: {},
-            });
-        }
-      } else {
-        res.status(200).json({
-          success: false,
-          status: 200,
-          message: "Invalid User! Not registered yet",
-          data: {},
-        });
-      }
     } catch (error) {
-      console.error("Error in OTP Login:", error);
-      res.status(500).json({
-        success: false,
-        status: 500,
-        message: "Error in processing OTP login",
-        data: {},
-      });
+      logger.error("Error in OTP Login:", error);
+      return res.status(500).json({ success: false, status: 500, message: "Error in processing OTP login", data: {}, });
     }
   },
+
 
   otpVerify: async (req, res) => {
     try {
       const lang = req.headers["language"] || req.headers["Language"];
-      const otpToken =
-        req.headers.authorization && req.headers.authorization.split(" ")[1];
+      const otpToken = req.headers.authorization?.split(" ")[1];
 
-      if (lang !== "en") {
-        if (!otpToken) {
-          return res.status(401).json({
-            success: false,
-            status: 401,
-            message: "Unauthorized: No token provided",
-          });
+      const { enteredOtp, isDOB } = req.body;
+
+      jwt.verify(otpToken, process.env.SECRET_KEY, async (err, decoded) => {
+        if (err)
+          return res.status(401).json({ success: false, status: 401, message: "Invalid OTP token!", data: {} });
+
+        const { uid, randomOtp, mobileNumber } = decoded;
+
+        // ---------- TOKEN BASED OTP (NO DB) ----------
+        if (randomOtp && mobileNumber) {
+          if (randomOtp !== enteredOtp)
+            return res.status(200).json({ success: false, status: 200, message: "Otp mismatch!" });
+
+          const authToken = jwt.sign({ mobileNumber }, process.env.SECRET_KEY, { expiresIn: "2d" });
+
+          return res.status(200).json({ success: true, status: 200, message: "Successfully verified mobile number", data: { token: authToken, isMpin: false }, });
         }
 
-        const { enteredOtp, isDOB } = req.body;
+        // ---------- DB BASED OTP ----------
+        const [userDataRows] = await pool
+          .promise()
+          .execute(`SELECT * FROM user_data WHERE uid = ? AND otp_expiry > NOW()`, [uid]);
 
-        jwt.verify(otpToken, process.env.SECRET_KEY, async (err, decoded) => {
-          if (err) {
-            return res.status(401).json({
-              success: false,
-              status: 401,
-              message: "Invalid OTP token!",
-              data: {},
-            });
-          }
+        if (!userDataRows.length)
+          return res.json({ success: false, status: 401, message: "Invalid OTP token or OTP expired", data: {} });
 
-          //database concept
-          const { uid, randomOtp, mobileNumber } = decoded;
-          //console.log({ uid, randomOtp, mobileNumber })
+        const { otp, mpin } = userDataRows[0];
+        const isOTPValid = enteredOtp === otp;
 
-          if (randomOtp && mobileNumber) {
-            if (randomOtp !== enteredOtp) {
-              return res.status(200).json({
-                success: false,
-                status: 200,
-                message: "Otp mismatch!",
-              });
-            }
+        if (!isOTPValid)
+          return res.json({ success: false, status: 401, message: lang !== "en" ? "अमान्य ओटीपी" : "Invalid OTP", data: {}, });
 
-            const authToken = jwt.sign(
-              { mobileNumber },
-              process.env.SECRET_KEY,
-              {
-                expiresIn: "2d",
-              }
-            );
+        const authToken = jwt.sign({ uid }, process.env.SECRET_KEY, { expiresIn: "2d" });
 
-            res.status(200).json({
-              success: true,
-              status: 200,
-              message: "Successfully verified mobile number",
-              data: {
-                token: authToken,
-                isMpin: false,
-              },
-            });
-          } else {
-            const query = `SELECT * FROM user_data WHERE uid = ? AND otp_expiry > NOW()`;
-            const [userDataRows] = await pool.promise().execute(query, [uid]);
+        await pool
+          .promise()
+          .execute(`UPDATE user_data SET auth_token = ? WHERE uid = ?`, [authToken, uid]);
 
-            if (userDataRows.length === 0) {
-              return res.json({
-                success: false,
-                status: 401,
-                message: "Invalid OTP token or OTP expired",
-                data: {},
-              });
-            }
-
-            const { otp, mpin } = userDataRows[0];
-
-            const isOTPValid = enteredOtp === otp;
-
-            if (isOTPValid) {
-              //auth token to pass throughout the applications
-              const authToken = jwt.sign({ uid }, process.env.SECRET_KEY, {
-                expiresIn: "2d",
-              });
-
-              // Store the new access token in the database
-              const updateTokenQuery = `UPDATE user_data SET auth_token = ? WHERE uid = ?`;
-              await pool.promise().execute(updateTokenQuery, [authToken, uid]);
-
-              res.json({
-                success: true,
-                status: 200,
-                message: isDOB
-                  ? "बधाई हो, खाता सत्यापन सफलतापूर्वक हो गया है"
-                  : "OTP सफलतापूर्वक सत्यापित हो जाता है",
-                data: {
-                  token: authToken,
-                  isMPIN: mpin ? true : false,
-                },
-              });
-            } else {
-              res.json({
-                success: false,
-                status: 401,
-                message: "अमान्य ओटीपी",
-                data: {},
-              });
-            }
-          }
+        return res.json({
+          success: true,
+          status: 200,
+          message:
+            lang !== "en"
+              ? isDOB
+                ? "बधाई हो, खाता सत्यापन सफलतापूर्वक हो गया है"
+                : "OTP सफलतापूर्वक सत्यापित हो जाता है"
+              : isDOB
+                ? "Congratulations, Account verification successfully done"
+                : "OTP verified successfully",
+          data: { token: authToken, isMPIN: !!mpin },
         });
-      } else {
-        if (!otpToken) {
-          return res.status(401).json({
-            success: false,
-            status: 401,
-            message: "Unauthorized: No token provided",
-          });
-        }
-
-        const { enteredOtp, isDOB } = req.body;
-
-        jwt.verify(otpToken, process.env.SECRET_KEY, async (err, decoded) => {
-          if (err) {
-            return res.status(401).json({
-              success: false,
-              status: 401,
-              message: "Invalid OTP token!",
-              data: {},
-            });
-          }
-
-          //database concept
-          const { uid, randomOtp, mobileNumber } = decoded;
-          //console.log({ uid, randomOtp, mobileNumber })
-
-          if (randomOtp && mobileNumber) {
-            if (randomOtp !== enteredOtp) {
-              return res.status(200).json({
-                success: false,
-                status: 200,
-                message: "Otp mismatch!",
-              });
-            }
-
-            const authToken = jwt.sign(
-              { mobileNumber },
-              process.env.SECRET_KEY,
-              {
-                expiresIn: "2d",
-              }
-            );
-
-            res.status(200).json({
-              success: true,
-              status: 200,
-              message: "Successfully verified mobile number",
-              data: {
-                token: authToken,
-                isMpin: false,
-              },
-            });
-          } else {
-            const query = `SELECT * FROM user_data WHERE uid = ? AND otp_expiry > NOW()`;
-            const [userDataRows] = await pool.promise().execute(query, [uid]);
-
-            if (userDataRows.length === 0) {
-              return res.json({
-                success: false,
-                status: 401,
-                message: "Invalid OTP token or OTP expired",
-                data: {},
-              });
-            }
-
-            const { otp, mpin } = userDataRows[0];
-
-            //verify otp
-            const isOTPValid = enteredOtp === otp;
-
-            if (isOTPValid) {
-              //auth token to pass throughout the applications
-              const authToken = jwt.sign({ uid }, process.env.SECRET_KEY, {
-                expiresIn: "2d",
-              });
-
-              // Store the new access token in the database
-              const updateTokenQuery = `UPDATE user_data SET auth_token = ? WHERE uid = ?`;
-              await pool.promise().execute(updateTokenQuery, [authToken, uid]);
-
-              res.json({
-                success: true,
-                status: 200,
-                message: isDOB
-                  ? "Congratulations, Account verification successfully done"
-                  : "OTP verified successfully",
-                data: {
-                  token: authToken,
-                  isMPIN: mpin ? true : false,
-                },
-              });
-            } else {
-              res.json({
-                success: false,
-                status: 401,
-                message: "Invalid OTP",
-                data: {},
-              });
-            }
-          }
-        });
-      }
+      });
     } catch (error) {
-      //console.log(error);
-      res.status(500).json({ error: "Internal server errror from verify OTP" });
+      return res.status(500).json({ error: "Internal server errror from verify OTP" });
     }
   },
+
 
   dobLogin: async (req, res) => {
     try {
@@ -403,198 +147,52 @@ module.exports = {
       const BYPASS_DOB = "1996-03-05";
       const BYPASS_OTP = "123456";
 
-      if (!loanAccountNumber && !dob) {
-        return res.status(400).json({
-          success: false,
-          status: 400,
-          message: "Missing details",
-          data: {},
-        });
-      }
+      if (!loanAccountNumber && !dob)
+        return res.status(400).json({ success: false, status: 400, message: "Missing details", data: {} });
 
-      const requesData = JSON.stringify({
-        loanAccountNumber: loanAccountNumber,
-        dob: dob,
-        //date_of_birth: dob
-      });
-
-      console.log(requesData);
-      console.log({
-        url: thirdPartyApi.getCustomerDetailsUsingMobile.endpoint,
+      const payload = {
         method: thirdPartyApi.getCustomerDetailsUsingMobile.method,
-        headers: thirdPartyApi.getCustomerDetailsUsingMobile.headers,
-        data: requesData,
-      });
-      const result = await apiFetcher({
         url: thirdPartyApi.getCustomerDetailsUsingMobile.endpoint,
-        method: thirdPartyApi.getCustomerDetailsUsingMobile.method,
         headers: thirdPartyApi.getCustomerDetailsUsingMobile.headers,
-        data: requesData,
-      });
-      console.log(5555, result);
-      if (!result || result?.Message) {
-        console.log("This issue occurs from third party APIs", result);
-        return res.status(200).json({
-          success: false,
-          status: 200,
-          message: result?.Message || "Invalid Mobile Number",
-        });
-      }
+        data: JSON.stringify({ loanAccountNumber, dob }),
+      };
 
-      let customerDataArray = [];
-      const customerData = result;
+      const result = await sendRequest(payload);
 
-      // Checking response to be in array or not
-      if (!Array.isArray(customerData?.customerDetails)) {
-        customerDataArray.push(customerData?.customerDetails);
-      } else {
-        customerDataArray = customerData?.customerDetails;
-      }
+      if (!result || result?.Message)
+        return res.status(200).json({ success: false, status: 200, message: result?.Message || "Invalid Mobile Number" });
 
-      // checking customerdatails exists or not
-      if (customerDataArray && customerDataArray.length > 0) {
-        const { applicantMobileNo, customerNumber } = customerDataArray[0];
+      const customerDataArray = Array.isArray(result?.customerDetails) ? result.customerDetails : [result?.customerDetails];
 
-        //console.log({ applicantMobileNo, customerNumber })
-        // Check if applicantMobileNo exists
-        if (applicantMobileNo && customerNumber) {
-          //const otp = isUAT ? process.env.TESTING_OTP_UAT : generateRandomOtp();
-          console.log(
-            loanAccountNumber === BYPASS_LOAN_ACCOUNT && dob === BYPASS_DOB,
-            loanAccountNumber,
-            BYPASS_DOB,
-            dob
-          );
-          let otp;
+      if (!customerDataArray?.length)
+        return res.status(500).json({ success: false, status: 500, message: "Invalid User! Not registered yet", data: {} });
 
-          if (loanAccountNumber === BYPASS_LOAN_ACCOUNT && dob === BYPASS_DOB) {
-            otp = BYPASS_OTP; // hard bypass
-            console.log("⚠️ OTP bypass applied for test credentials");
-          } else {
-            otp = isUAT ? process.env.TESTING_OTP_UAT : generateRandomOtp();
-          }
-          console.log(123132123132, otp);
-          //const otp = process.env.TESTING_OTP_UAT
+      const { applicantMobileNo, customerNumber } = customerDataArray[0];
 
-          const query = `SELECT * FROM user_data WHERE mobile_number = ?`;
-          const [userDataRows] = await pool
-            .promise()
-            .execute(query, [applicantMobileNo]);
-          let uid;
-          if (userDataRows.length === 0) {
-            uid = uuid.v4();
-          } else {
-            uid = userDataRows[0].uid;
-          }
+      if (!applicantMobileNo || !customerNumber)
+        return res.status(401).json({ success: false, status: 401, message: "User not exists", data: {} });
 
-          const shouldSendOtp = !(
-            loanAccountNumber === BYPASS_LOAN_ACCOUNT && dob === BYPASS_DOB
-          );
+      const isBypass = loanAccountNumber === BYPASS_LOAN_ACCOUNT && dob === BYPASS_DOB;
+      const otp = isBypass ? BYPASS_OTP : (isUAT ? process.env.TESTING_OTP_UAT : generateRandomOtp());
 
-          //bypass otp sender
-          if (shouldSendOtp && (await sendOTP(applicantMobileNo, otp))) {
-            //storing data into database
-            //await saveUserData({ applicantMobileNo, otp, customerDataArray, uid, loanAccountNumber, dob })
-            const mobileNumber = applicantMobileNo;
-            await saveUserData({
-              mobileNumber,
-              otp,
-              customerDataArray,
-              uid,
-              loanAccountNumber,
-              dob,
-            });
+      const [[existingUser]] = await pool.promise().execute(`SELECT uid FROM user_data WHERE mobile_number = ?`, [applicantMobileNo]);
 
-            const otpToken = jwt.sign({ uid }, process.env.SECRET_KEY, {
-              expiresIn: "5m",
-            });
+      const uid = existingUser?.uid || uuid.v4();
+      const shouldSendOtp = !isBypass;
 
-            res.json({
-              success: true,
-              status: 200,
-              message: "OTP sent successfully!!",
-              data: {
-                token: otpToken,
-                otp: otp,
-              },
-            });
-          } else {
-            if (!shouldSendOtp) {
-              console.log(123456);
-              const mobileNumber = applicantMobileNo;
-              await saveUserData({
-                mobileNumber,
-                otp,
-                customerDataArray,
-                uid,
-                loanAccountNumber,
-                dob,
-              });
+      if (shouldSendOtp && !(await sendOTP(applicantMobileNo, otp)))
+        return res.status(500).json({ success: false, status: 500, message: "Failed to send OTP", data: {} });
 
-              const otpToken = jwt.sign({ uid }, process.env.SECRET_KEY, {
-                expiresIn: "5m",
-              });
+      await saveUserData({ mobileNumber: applicantMobileNo, otp, customerDataArray, uid, loanAccountNumber, dob });
 
-              res.json({
-                success: true,
-                status: 200,
-                message: "OTP sent successfully!!",
-                data: {
-                  token: otpToken,
-                  otp: BYPASS_OTP,
-                },
-              });
-            }
+      const otpToken = jwt.sign({ uid }, process.env.SECRET_KEY, { expiresIn: "5m" });
 
-            res.status(500).json({
-              success: false,
-              status: 500,
-              message: "Failed to send OTP",
-              data: {},
-            });
-          }
+      return res.status(200).json({ success: true, status: 200, message: "OTP sent successfully!!", data: { token: otpToken, otp: shouldSendOtp ? otp : BYPASS_OTP }, });
 
-          /*const mobileNumber = applicantMobileNo
-                    await saveUserData({ mobileNumber, otp, customerDataArray, uid, loanAccountNumber, dob })
-
-                    const otpToken = jwt.sign({ uid }, process.env.SECRET_KEY, {
-                        expiresIn: "5m",
-                    });
-
-                    res.json({
-                        success: true,
-                        status: 200,
-                        message: "OTP sent successfully!!",
-                        data: {
-                            token: otpToken,
-                            otp: otp
-                        },
-                    });*/
-        } else {
-          res.status(401).json({
-            success: false,
-            status: 401,
-            message: "User not exists",
-            data: {},
-          });
-        }
-      } else {
-        res.status(500).json({
-          success: false,
-          status: 500,
-          message: "Invalid User! Not registered yet",
-          data: {},
-        });
-      }
     } catch (error) {
-      // console.error("Error in OTP Login:", error);
-      res.status(500).json({
-        success: false,
-        status: 500,
-        message: "Error in processing OTP login",
-        data: {},
-      });
+      return res.status(500).json({ success: false, status: 500, message: "Error in processing OTP login", data: {} });
     }
+
   },
 
   logout: async (req, res) => {

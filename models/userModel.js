@@ -1,5 +1,5 @@
 const { pool } = require("../models/db");
-// const { generateSalt32Byte, encryptData } = require("../utils/encryptData");
+const { logger } = require("../utils/logger");
 
 async function saveUserData({ mobileNumber, otp, customerDataArray, uid, loanAccountNumber, dob }) {
   try {
@@ -8,17 +8,21 @@ async function saveUserData({ mobileNumber, otp, customerDataArray, uid, loanAcc
     const [existingUser] = await pool
       .promise()
       .query("SELECT * FROM user_data WHERE mobile_number = ?", [mobileNumber]);
-    // .query("SELECT * FROM user_data WHERE mobile_number = ? OR loanAccountNumber = ?", [mobileNumber, loanAccountNumber]);
 
+    // ---------- UPDATE EXISTING USER ----------
     if (existingUser.length > 0) {
-      //update user details with same mobileNumber
       const updateQuery = `
         UPDATE user_data
-        SET otp = ?, customer_data = ?, uid = ?, dob = ?, loanAccountNumber = ?, otp_expiry = NOW() + INTERVAL 30 MINUTE
+        SET
+          otp = ?,
+          customer_data = ?,
+          uid = ?,
+          dob = ?,
+          loanAccountNumber = ?,
+          otp_expiry = NOW() + INTERVAL 30 MINUTE
         WHERE mobile_number = ?
-       
       `;
-      // WHERE mobile_number = ? OR loanAccountNumber = ?
+
       const updateValues = [
         otp || null,
         customerDataJson,
@@ -28,41 +32,45 @@ async function saveUserData({ mobileNumber, otp, customerDataArray, uid, loanAcc
         mobileNumber || null,
       ];
 
-      //console.log({ updateValues })
-      //console.log({ updateQuery })
-
       try {
         await pool.promise().execute(updateQuery, updateValues);
-        //console.log("User data updated successfully");
       } catch (error) {
-        console.log("Error in running query of update in database")
+        logger.error("Error in running query of update in database");
       }
 
-    } else {
-      const insertQuery = `
-        INSERT INTO user_data (mobile_number, otp, customer_data, uid, loanAccountNumber, dob, otp_expiry)
-        VALUES (?, ?, ?, ?, ?, ?, NOW() + INTERVAL 30 MINUTE)
-      `;
-
-      const insertValues = [
-        mobileNumber || null,
-        otp || null,
-        customerDataJson,
-        uid,
-        loanAccountNumber || null,
-        dob || null,
-      ];
-
-      //console.log({ insertValues })
-
-      await pool.promise().execute(insertQuery, insertValues);
-      //console.log("User data inserted successfully");
+      return;
     }
+
+    // ---------- INSERT NEW USER ----------
+    const insertQuery = `
+      INSERT INTO user_data (
+        mobile_number,
+        otp,
+        customer_data,
+        uid,
+        loanAccountNumber,
+        dob,
+        otp_expiry
+      )
+      VALUES (?, ?, ?, ?, ?, ?, NOW() + INTERVAL 30 MINUTE)
+    `;
+
+    const insertValues = [
+      mobileNumber || null,
+      otp || null,
+      customerDataJson,
+      uid,
+      loanAccountNumber || null,
+      dob || null,
+    ];
+
+    await pool.promise().execute(insertQuery, insertValues);
+
   } catch (error) {
-    // console.error("Error saving user data:", error);
     throw error;
   }
 }
+
 
 async function saveTransactionDetails({
   transactionId,
@@ -144,8 +152,8 @@ async function saveRequestPaymentDetails(finalEncryptedData) {
   try {
 
     const { applicationId, paymentAmount, paymentType, paymentDesc, loanAccountNumber, customerNumber, dob, customerName, mobileNumber, orderId, crmClientID, salt } = finalEncryptedData
-	
-	//console.log(finalEncryptedData.dob, finalEncryptedData.paymentAmounts)
+
+    //console.log(finalEncryptedData.dob, finalEncryptedData.paymentAmounts)
     const insertQuery = `
         INSERT INTO request_payment (application_id, dob, customer_name, loan_account_no, mobile, order_id, payment_amount, payment_type, payment_desc, crm_client_id, salt, inserted_date)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`;
@@ -163,7 +171,7 @@ async function saveRequestPaymentDetails(finalEncryptedData) {
       crmClientID || null,
       salt || null
     ];
-	//console.log(insertValues)
+    //console.log(insertValues)
     await pool.promise().execute(insertQuery, insertValues);
     //console.log("Request payment data inserted successfully");
 
@@ -219,62 +227,62 @@ async function saveResponsePaymentDetails(finalEncryptedData) {
 }
 
 async function insertPaymentDetails(payload) {
-    try {
+  try {
 
-        const { customerId, mobile, orderId, responseCode, responseMsg, responseStatus, mode, amount, txnId, loanAccountNumber } = payload
+    const { customerId, mobile, orderId, responseCode, responseMsg, responseStatus, mode, amount, txnId, loanAccountNumber } = payload
 
-        const insertQuery = `
+    const insertQuery = `
         INSERT INTO payment_details (customerId, mobile, orderId, amount, responseCode, responseMsg, responseStatus, mode, txnId, loanAccountNumber, createdAt)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`;
 
-        const insertValues = [
-            customerId,
-            mobile,
-            orderId,
-            amount,
-            responseCode,
-            responseMsg,
-            responseStatus,
-            mode,
-            txnId, 
-			loanAccountNumber
-        ];
+    const insertValues = [
+      customerId,
+      mobile,
+      orderId,
+      amount,
+      responseCode,
+      responseMsg,
+      responseStatus,
+      mode,
+      txnId,
+      loanAccountNumber
+    ];
 
-        await pool.promise().execute(insertQuery, insertValues);
-        //console.log("Response payment data inserted successfully");
+    await pool.promise().execute(insertQuery, insertValues);
+    //console.log("Response payment data inserted successfully");
 
-    } catch (error) {
-        console.error("Error saving response payment data:", error);
-        throw error;
-    }
+  } catch (error) {
+    console.error("Error saving response payment data:", error);
+    throw error;
+  }
 }
 
 async function updatePaymentDetailsByOrderId(payload) {
-    try {
-        const { orderId, responseCode, responseMsg, responseStatus, txnId, mode } = payload;
-			console.log('adfdsaf', { orderId, responseCode, responseMsg, responseStatus, txnId, mode })
-        const updateQuery = `
+  try {
+    const { orderId, responseCode, responseMsg, responseStatus, txnId, mode } = payload;
+    console.log('adfdsaf', { orderId, responseCode, responseMsg, responseStatus, txnId, mode })
+    const updateQuery = `
             UPDATE payment_details
             SET responseCode = ?, responseMsg = ?, responseStatus = ?, txnId = ?, mode = ?, updatedAt = NOW()
             WHERE orderId = ?
         `;
 
-        const updateValues = [
-            responseCode ?? null,
-            responseMsg ?? null,
-            responseStatus ?? null,
-            txnId ?? null,
-            mode ?? null,
-            orderId ?? null
-        ];
+    const updateValues = [
+      responseCode ?? null,
+      responseMsg ?? null,
+      responseStatus ?? null,
+      txnId ?? null,
+      mode ?? null,
+      orderId ?? null
+    ];
 
-        const [result] = await pool.promise().execute(updateQuery, updateValues);
+    const [result] = await pool.promise().execute(updateQuery, updateValues);
 
-        return result;
-    } catch (error) {
-        console.error("Error updating payment details:", error);
-        throw error;
-    }
+    return result;
+  } catch (error) {
+    console.error("Error updating payment details:", error);
+    throw error;
+  }
 }
 
 async function getCustomerDetails(uid) {

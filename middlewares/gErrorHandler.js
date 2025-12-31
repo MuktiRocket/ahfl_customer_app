@@ -1,5 +1,5 @@
 // const generalConfig = require("../configs/generalConfig");
-const logger = require('../utils/logger');
+const { logger } = require('../utils/logger');
 // const responseSender = require("../../utils/responseSender");
 const utils = require('../utils/commonUtils');
 
@@ -25,10 +25,10 @@ const gErrorHandler = (err, req, res, next) => {
 
     // For older verison 1.0.1 of mobile app response must be this
     if (err?.status == 401 && req.version <= "1.0.2")
-        return res.json( errors.bearerTokenError.statusCode, errors.bearerTokenError.description);
+        return res.json(errors.bearerTokenError.statusCode, errors.bearerTokenError.description);
 
     if (err?.status == 401 && req.version > "1.0.2")
-        return res.json( err.status, { success: false, message: err.message });
+        return res.json(err.status, { success: false, message: err.message });
 
     if (err?.status && err?.status < 500)
         return res.status(err.status).json({ success: false, message: err.message });

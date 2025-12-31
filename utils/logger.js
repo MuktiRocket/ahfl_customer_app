@@ -107,6 +107,8 @@ const responseLogger = createLogger({
     )
 });
 
-module.exports = logger;
-module.exports.requestLogger = requestLogger;
-module.exports.responseLogger = responseLogger;
+module.exports = {
+    logger,
+    requestLogger,
+    responseLogger,
+};

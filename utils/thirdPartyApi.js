@@ -7,9 +7,9 @@ const methods = {
     PATCH: "patch"
 };
 
-const isLocalAndUAT = ["local"].some((name) => process.env.NODE_ENV === name);
+const isLocalAndUAT = ["local", "uat"].some((name) => process.env.NODE_ENV === name);
 //credentials
-const thirdPartyApiToken = isLocalAndUAT ? process.env.UAT_THIRD_PARTY_API_TOKEN : process.env.THIRD_PARTY_API_TOKEN;
+const thirdPartyApiToken = isLocalAndUAT ? process.env.UAT_THIRD_PARTY_API_TOKEN : process.env.Third_Party_Api_Token;
 const CRMTokenUsername = isLocalAndUAT ? process.env.UAT_CRM_TOKEN_USERNAME : process.env.CRM_TOKEN_USERNAME;
 const CRMTokenPassword = isLocalAndUAT ? process.env.UAT_CRM_TOKEN_PASSWORD : process.env.CRM_TOKEN_PASSWORD;
 const CRMTokenIdentifier = isLocalAndUAT ? process.env.UAT_CRM_TOKEN_IDENTIFIER : process.env.CRM_TOKEN_IDENTIFIER;
@@ -38,6 +38,8 @@ else
 
 
 module.exports = {
+    methods,
+
     getCustomerDetailsUsingMobile: {
         endpoint: customerDetailsUsingMobile,
         method: methods.POST,
