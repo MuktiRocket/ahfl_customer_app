@@ -2,21 +2,19 @@ const apiFetcher = require("../utils/apiFetcher");
 const responseMessage = require("../utils/responseMessage");
 const responseSender = require("../utils/responseSender");
 const thirdPartyApi = require("../utils/thirdPartyApi");
-const request = require("request");
 const FormData = require("form-data");
 const qs = require("qs");
-const {
-  saveCRMRequestData,
-  updateCRMRequestDataByTicketId,
-} = require("../models/crmDataModel");
+const { saveCRMRequestData, updateCRMRequestDataByTicketId } = require("../models/crmDataModel");
 const { sendRequest } = require("../utils/thirdPartyApiService");
 const { updateApplyLoanLeadId } = require("../models/userModel");
 const { logger } = require("../utils/logger");
 
 const PROB_SUMMARY_FOR_EMAIL = "Updation/Rectification of Email ID";
 const PROB_SUMMARY_FOR_MOBILE = "Updation/Rectification of Mobile number";
+const ARRAY_BUFFER_RESPONSE = "arraybuffer";
 
 module.exports = {
+
   getCRMRequestData: async (req, res) => {
     try {
       const lang = req.headers["language"] || req.headers["Language"];
@@ -84,123 +82,81 @@ module.exports = {
       const lang = req.headers["language"] || req.headers["Language"];
       const requestData = req.body;
 
-      const result = await apiFetcher({
-        url: thirdPartyApi.getTokenForLetterGeneration.endpoint,
+      // ---------- GET ACCESS TOKEN ----------
+      const tokenPayload = {
         method: thirdPartyApi.getTokenForLetterGeneration.method,
+        url: thirdPartyApi.getTokenForLetterGeneration.endpoint,
         headers: thirdPartyApi.getTokenForLetterGeneration.headers,
         data: qs.stringify(thirdPartyApi.getTokenForLetterGeneration.data),
-        useReverseProxy: true, // Use reverse proxy
-        proxy: "http://10.130.1.1:8080", // Custom proxy URL
-      });
-      //console.log({ result })
+      };
 
-      if (!result || !result?.access_token) {
-        return result.status(401).json({
-          success: false,
-          status: 401,
-          message: "Error in getting access token from third party api",
-        });
-      }
-      const access_token = result?.access_token;
+      const tokenResult = await sendRequest(tokenPayload);
 
-      /*const proxy = "http://10.130.1.1:8080";
-      const agent = new HttpsProxyAgent(proxy);
-    	
-      const letterData = await axios.post(thirdPartyApi.getGeneratedToken.endpoint, {
-        headers: {
-                    'Content-Type' : 'application/json',
-                    'Authorization' : `Bearer ${access_token}`,
-           Accept: 'application/pdf',
-                },
-        responseType: 'arraybuffer',
-        httpsAgent: agent,
-        timeout: 10000
-      });*/
+      if (!tokenResult?.access_token)
+        return res.status(401).json({ success: false, status: 401, message: "Error in getting access token from third party api" });
 
-      /*const letterData = await apiFetcher({
-                url: thirdPartyApi.getGeneratedToken.endpoint,
-                method: thirdPartyApi.getGeneratedToken.method,
-                headers: {
-                    ...thirdPartyApi.getGeneratedToken.headers,
-                    Authorization: `Bearer ${access_token}`,
-                },
-                data: requestData,
-                //useReverseProxy: true,  // Use reverse proxy
-                //proxy: 'http://10.130.1.1:8080',  // Custom proxy URL
-            });*/
+      const access_token = tokenResult.access_token;
 
-      //console.log(thirdPartyApi.getGeneratedToken.endpoint);
-      //console.log( 12313232, letterData )
-
-      // OLD CODE
-      // const letter = Buffer.from(letterData).toString('base64')
-      // if (!letterData) {
-      //     return responseSender(res, responseMessage.errorPdfGeneration.statusCode, responseMessage.errorPdfGeneration.description[lang], false)
-      // } else {
-      //     return res.json({
-      //         success: true,
-      //         status: 200,
-      //         message: "Pdf Generated successfully",
-      //         data: letter,
-      //     });
-      // }
-
-      var options = {
+      // ---------- PDF GENERATION ----------
+      const response = await sendRequest({
         method: thirdPartyApi.getGeneratedToken.method,
         url: thirdPartyApi.getGeneratedToken.endpoint,
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${access_token}`,
         },
-        body: JSON.stringify(requestData),
-        encoding: null,
-      };
-      console.log(111, options);
-      request(options, function (error, response) {
-        if (error) throw new Error(error);
-        console.log(222, response.body);
-        const pdfBuffer = response.body;
-
-        // Optional: check content-type header
-        const contentType = response.headers["content-type"];
-        console.log(contentType);
-        if (contentType === "application/pdf") {
-          const base64PDF = Buffer.from(pdfBuffer).toString("base64");
-          return res.json({
-            success: true,
-            status: 200,
-            message: "PDF Generated successfully",
-            data: base64PDF,
-          });
-        } else {
-          //console.log(123)
-          const base64PDF = Buffer.from(pdfBuffer).toString("base64");
-          return responseSender(
-            res,
-            responseMessage.errorPdfGeneration.statusCode,
-            responseMessage.errorPdfGeneration.description[lang],
-            false,
-            base64PDF
-          );
-        }
-        //return res.json({ success: true, status: 200, message: "Pdf Generated successfully", data: response.body });
+        data: requestData,
+        responseType: ARRAY_BUFFER_RESPONSE,
       });
 
-      //console.log(132132132, letterData)
-      /*if (letterData && letterData?.status != 500 && letterData?.error != 'Internal Server Error') {
-                const letterDataString = typeof letterData === 'object' ? JSON.stringify(letterData) : letterData;
-                const letter = Buffer.from(letterDataString).toString('base64');
+      const { status, headers, data } = response;
+      console.log(status, headers, data)
+      const contentType = headers?.["content-type"] || "";
 
-                return res.json({ success: true, status: 200, message: "Pdf Generated successfully", data: letterData });
-            } else {
-                return responseSender(res, responseMessage.errorPdfGeneration.statusCode, responseMessage.errorPdfGeneration.description[lang], false, letterData)
-            }*/
+      // ❌ THIRD-PARTY ERROR (500, 400 etc.)
+      if (status !== 200) {
+        let errorMessage = "PDF generation failed";
+
+        try {
+          const errorJson = JSON.parse(Buffer.from(data).toString());
+          errorMessage = errorJson?.error || errorJson?.message || errorMessage;
+        } catch (_) {
+          errorMessage = Buffer.from(data).toString();
+        }
+
+        return res.status(500).json({
+          success: false,
+          status: 500,
+          message: errorMessage,
+        });
+      }
+
+      // ❌ NOT A PDF RESPONSE
+      if (!contentType.includes("application/pdf")) {
+        return responseSender(
+          res,
+          responseMessage.errorPdfGeneration.statusCode,
+          responseMessage.errorPdfGeneration.description[lang],
+          false
+        );
+      }
+
+      // ✅ SUCCESS PDF
+      const base64PDF = Buffer.from(data).toString("base64");
+
+      return res.json({
+        success: true,
+        status: 200,
+        message: "PDF Generated successfully",
+        data: base64PDF,
+      });
+
     } catch (error) {
-      console.log("Error is:", error)
+      const errorJSON = JSON.parse(error)
       return res.status(500).json({
         success: false,
         status: 500,
-        message: error.message,
+        message: errorJSON || "Internal server error while generating PDF",
       });
     }
   },
