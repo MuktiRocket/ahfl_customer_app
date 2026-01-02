@@ -18,7 +18,7 @@ const {
 const {
   getTokenForLetterGeneration,
 } = require("../middlewares/letterGenarate/getTokenForLetterGeneration");
-const validateCRMRequest = require("../validations/appControllerValidations");
+const { validateCRMRequest, validateLetterGenerationRequest } = require("../validations/appControllerValidations");
 const validate = require("../middlewares/ValidationMiddleware");
 
 const router = express.Router();
@@ -233,7 +233,7 @@ router.get("/loanApplicationStatus", async (req, res) => {
 // }
 // );
 
-router.post("/letterGeneration", verifyToken, appController.getLetterGenerationData);
+router.post("/letterGeneration", verifyToken, validate(validateLetterGenerationRequest), appController.getLetterGenerationData);
 
 router.post("/crmRequest", verifyToken, validate(validateCRMRequest), appController.getCRMRequestData);
 

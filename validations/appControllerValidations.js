@@ -26,4 +26,21 @@ const validateCRMRequest = Joi.object({
   changedMobile: Joi.string().empty("").optional(),
 });
 
-module.exports = validateCRMRequest;
+const validateLetterGenerationRequest = Joi.object({
+  nbfcName: Joi.string().trim().required(),
+
+  reportID: Joi.string().trim().required(),
+
+  queryFilters: Joi.array()
+    .items(
+      Joi.object({
+        filterName: Joi.string().trim().required(),
+        filterValue: Joi.string().trim().required(),
+        paramIndex: Joi.string().trim().required(),
+      })
+    )
+    .min(1)
+    .required(),
+});
+
+module.exports = { validateCRMRequest, validateLetterGenerationRequest };
