@@ -1,4 +1,5 @@
 const apiFetcher = require("../utils/apiFetcher");
+const { pool } = require("../models/db");
 const responseMessage = require("../utils/responseMessage");
 const responseSender = require("../utils/responseSender");
 const thirdPartyApi = require("../utils/thirdPartyApi");
@@ -8,6 +9,7 @@ const { saveCRMRequestData, updateCRMRequestDataByTicketId } = require("../model
 const { sendRequest } = require("../utils/thirdPartyApiService");
 const { updateApplyLoanLeadId } = require("../models/userModel");
 const { logger } = require("../utils/logger");
+const { formatLoanAccountNumber } = require("../utils/generateOtp");
 
 const PROB_SUMMARY_FOR_EMAIL = "Updation/Rectification of Email ID";
 const PROB_SUMMARY_FOR_MOBILE = "Updation/Rectification of Mobile number";
@@ -164,99 +166,125 @@ module.exports = {
   getCustomerDetails: async (req, res) => {
     try {
       const { uid } = req.data;
-      const query = `SELECT * FROM user_data WHERE uid = ?`;
-      const [userDataRows] = await pool.promise().execute(query, [uid]);
 
-      if (userDataRows.length === 0 || userDataRows[0].auth_token === null) {
-        return res.status(401).json({
-          success: false,
-          message: "Invalid auth token or expired",
-        });
-      }
+      // ---------- AUTH VALIDATION ----------
+      const [rows] = await pool.promise().execute(
+        `SELECT customer_data, auth_token FROM user_data WHERE uid = ?`,
+        [uid]
+      );
 
-      const { customer_data } = userDataRows[0];
-      const parsedData = JSON.parse(customer_data);
-      console.log({ parsedData });
+      if (!rows.length || !rows[0].auth_token)
+        return res.status(401).json({ success: false, message: "Invalid auth token or expired" });
 
-      //using request
-      let outstandingData = [];
-      const customerDetailsWithOutstandingData = Array.isArray(parsedData)
-        ? parsedData
-        : [parsedData];
-      console.log({ customerDetailsWithOutstandingData });
+      // ---------- CUSTOMER DATA ----------
+      const parsedData = JSON.parse(rows[0].customer_data);
+      const customerList = Array.isArray(parsedData) ? parsedData : [parsedData];
 
-      const fetchData = (formattedLoanAccountNumber, callback) => {
-        const options = {
-          url: thirdPartyApi.getLoanOutstanding.endpoint,
-          method: thirdPartyApi.getLoanOutstanding.method,
-          headers: thirdPartyApi.getLoanOutstanding.headers,
-          body: JSON.stringify({
-            lm_applno: formattedLoanAccountNumber,
-          }),
-        };
-
-        apiFetcher(options, false)
-          .then((apiResponse) => {
-            callback(null, apiResponse);
-          })
-          .catch((error) => {
-            callback(error, null);
-          });
+      // ---------- FETCH OUTSTANDING USING sendRequest ----------
+      const fetchOutstanding = async (loanAccountNumber) => {
+        try {
+          const payload = {
+            method: thirdPartyApi.getLoanOutstanding.method,
+            url: thirdPartyApi.getLoanOutstanding.endpoint,
+            headers: thirdPartyApi.getLoanOutstanding.headers,
+            data: { lm_applno: formatLoanAccountNumber(loanAccountNumber) },
+          };
+          return await sendRequest(payload);
+        } catch (err) {
+          logger.error(`Outstanding fetch failed for ${loanAccountNumber}`, err);
+          return null;
+        }
       };
 
-      const fetchOutstandingData = async () => {
-        const promises = customerDetailsWithOutstandingData.map((customer) => {
-          return new Promise((resolve, reject) => {
-            const { applicationNo, loanAccountNumber } = customer;
+      const loanOutstanding = await Promise.all(
+        customerList.map(async ({ loanAccountNumber }) => ({
+          outstandingData: await fetchOutstanding(loanAccountNumber),
+        }))
+      );
 
-            const formattedLoanAccountNumber =
-              formatLoanAccountNumber(loanAccountNumber);
-            //console.log({ loanAccountNumber, formattedLoanAccountNumber })
-
-            fetchData(formattedLoanAccountNumber, (error, apiResponse) => {
-              if (error) {
-                console.error(
-                  `Failed to fetch data for loanAccountNumber ${formattedLoanAccountNumber}:`,
-                  error
-                );
-                resolve({
-                  // ...customer,
-                  outstandingData: null,
-                });
-              } else {
-                console.log(
-                  `Response for loanAccountNumber ${formattedLoanAccountNumber}:`,
-                  apiResponse
-                );
-                resolve({
-                  // ...customer,
-                  outstandingData: apiResponse,
-                });
-              }
-            });
-          });
-        });
-
-        outstandingData = await Promise.all(promises);
-        //console.log({ outstandingData });
-      };
-
-      await fetchOutstandingData();
-
-      res.json({
+      // ---------- RESPONSE ----------
+      return res.json({
         success: true,
         message: "Successfully fetched customer details",
         data: {
           customerDetails: parsedData,
-          loanOutstanding: outstandingData.filter((data) => data !== null), // Filter out null values
+          loanOutstanding: loanOutstanding.filter(o => o.outstandingData),
         },
       });
+
     } catch (error) {
-      //console.log(error);
-      res.status(500).json({
+      console.error("getCustomerDetails error:", error);
+      return res.status(500).json({
         success: false,
         message: "Internal server error from get customer details route",
       });
+    }
+  },
+
+  getCustomerDetailsModified: async (req, res) => {
+    try {
+      const { uid } = req.data;
+
+      // ---------- AUTH CHECK ----------
+      const [rows] = await pool.promise().execute(
+        `SELECT customer_data, auth_token FROM user_data WHERE uid = ?`,
+        [uid]
+      );
+
+      if (!rows.length || !rows[0].auth_token)
+        return res.status(401).json({ success: false, message: "Invalid auth token or expired" });
+
+      // ---------- CUSTOMER DATA (FILTER CLOSED LOANS) ----------
+      const parsedData = JSON.parse(rows[0].customer_data).filter(
+        i => i?.loanstatus?.trim()?.toLowerCase() !== "closed"
+      );
+
+      const customerList = Array.isArray(parsedData) ? parsedData : [parsedData];
+
+
+      /*
+      const loanOutstanding = await Promise.all(
+        customerList.map(async ({ loanAccountNumber }) => ({
+          outstandingData: await fetchOutstanding(loanAccountNumber),
+        }))
+      );
+      */
+
+      // ---------- RESPONSE ----------
+      return res.json({
+        success: true,
+        message: "Successfully fetched customer details",
+        data: {
+          customerDetails: parsedData,
+          loanOutstanding: [
+            {
+              applicationid: "V0140940",
+              custmername: "Balaji K V",
+              totalout: "0.00",
+              branchcode: "BR123",
+            },
+          ],
+        },
+      });
+
+    } catch (error) {
+      logger.error("getCustomerDetails error:", error);
+      return res.status(500).json({ success: false, message: "Internal server error from get customer details route", });
+    }
+  },
+
+  fetchOutstanding: async (loanAccountNumber) => {
+    try {
+      const payload = {
+        method: thirdPartyApi.getLoanOutstanding.method,
+        url: thirdPartyApi.getLoanOutstanding.endpoint,
+        headers: thirdPartyApi.getLoanOutstanding.headers,
+        data: { lm_applno: formatLoanAccountNumber(loanAccountNumber) },
+      };
+      return await sendRequest(payload);
+    } catch (err) {
+      logger.error(`Outstanding fetch failed for ${loanAccountNumber}`, err);
+      return null;
     }
   },
 
