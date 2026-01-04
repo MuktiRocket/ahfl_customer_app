@@ -266,7 +266,7 @@ module.exports = {
       const loanId = req.loanId;
 
       if (applyLoanData?.lead_id && applyLoanData?.status_code === "0001") {
-        await updateApplyLoanLeadId({ id: loanId, lead_id: pplyLoanData.lead_id })
+        await updateApplyLoanLeadId({ id: loanId, lead_id: applyLoanData.lead_id })
         return res.status(200).json({ success: true, status: 200, message: applyLoanData.message, data: { lead_id: applyLoanData.lead_id }, });
       }
 
