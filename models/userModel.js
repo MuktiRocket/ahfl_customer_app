@@ -376,6 +376,38 @@ async function updateApplyLoanLeadId({ id, lead_id }) {
   }
 }
 
+async function saveFeedback(payload) {
+  try {
+    const { uid, rating, comment, mobile_number } = payload;
+    const insertQuery = `
+      INSERT INTO feedback (
+        user_id,
+        mobile,
+        rating,
+        comment,
+        created_at,
+        updated_at
+      )
+      VALUES (?, ?, ?, ?, NOW(), NOW())
+    `;
+
+    const insertValues = [
+      uid || null,
+      mobile_number || null,
+      rating || null,
+      comment || null,
+    ];
+
+    const [result] = await pool.promise().execute(insertQuery, insertValues);
+
+    return result.insertId;
+  } catch (error) {
+    logger.error("Error saving feedback:", error);
+    throw error;
+  }
+}
 
 
-module.exports = { saveUserData, saveTransactionDetails, saveRequestPaymentDetails, saveResponsePaymentDetails, getCustomerDetails, insertPaymentDetails, updatePaymentDetailsByOrderId, saveApplyLoanData, updateApplyLoanLeadId };
+
+
+module.exports = { saveUserData, saveTransactionDetails, saveRequestPaymentDetails, saveResponsePaymentDetails, getCustomerDetails, insertPaymentDetails, updatePaymentDetailsByOrderId, saveApplyLoanData, updateApplyLoanLeadId, saveFeedback };

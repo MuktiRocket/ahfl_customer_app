@@ -1,5 +1,8 @@
 const express = require("express");
 const utilityController = require("../controllers/utilityController");
+const { verifyToken } = require("../middlewares/verifyToken");
+const validate = require("../middlewares/ValidationMiddleware");
+const { feedbackValidation } = require("../validations/utilityControllerValidation");
 
 const router = express.Router();
 
@@ -11,5 +14,6 @@ router.get("/faq", utilityController.getFaq);
 router.get("/aboutUs", utilityController.getAboutUs);
 router.get("/privacyPolicy", utilityController.getPrivacyPolicyData);
 router.get("/feeCharges", utilityController.getFeeAndCharges);
+router.post("/insert-feedback", verifyToken, validate(feedbackValidation), utilityController.insertFeedback);
 
 module.exports = [router];

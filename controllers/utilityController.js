@@ -1,5 +1,6 @@
 const { pool } = require("../models/db");
 const config = require("../config");
+const { saveFeedback } = require("../models/userModel");
 
 module.exports = {
   getBanner: async (req, res) => {
@@ -39,16 +40,16 @@ module.exports = {
               break;
           }
         });
-		
-		const excludedIds = [14, 15];
 
-		const filteredResult = {};
+        const excludedIds = [14, 15];
 
-		for (const section in filteredBanners) {
-		  filteredResult[section] = filteredBanners[section].filter(
-			banner => !excludedIds.includes(banner.id)
-		  );
-		}
+        const filteredResult = {};
+
+        for (const section in filteredBanners) {
+          filteredResult[section] = filteredBanners[section].filter(
+            banner => !excludedIds.includes(banner.id)
+          );
+        }
 
         // const bannersWithImageUrl = bannerDataRows.map((banner) => {
         //   return {
@@ -683,5 +684,23 @@ module.exports = {
         data: {},
       });
     }
+  },
+
+  insertFeedback: async (req, res) => {
+    const { uid } = req.data;
+    const { rating, comment } = req.body;
+
+    const [rows] = await pool.promise().execute(
+      `SELECT * FROM user_data WHERE uid = ?`,
+      [uid]
+    );
+    if (!rows.length)
+      return res.status(404).json({ success: false, status: 404, message: "User not found" });
+
+    const { mobile_number } = rows[0];
+
+    const data = saveFeedback({ uid, rating, comment, mobile_number })
+
+    res.json(data)
   }
 };
