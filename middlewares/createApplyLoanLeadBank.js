@@ -22,7 +22,7 @@ const createApplyLoanLeadBank = async (req, res, next) => {
     return next();
 
   } catch (error) {
-    logger.error("Error fetching data from ApplyLoanLeadBank API:", error?.message, error?.response?.data);
+    logger.error(`Error fetching data from ApplyLoanLeadBank API :: ${error?.message, error?.response?.data}`);
     return res.status(500).json({ success: false, status: 500, message: "Internal Server Error while fetching data from ApplyLoanLeadBank API" });
   }
 };

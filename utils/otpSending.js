@@ -1,6 +1,7 @@
 const { sendRequest } = require("./thirdPartyApiService"); // adjust path if needed
 const { logger } = require("./logger");
 const thirdPartyApi = require("./thirdPartyApi");
+const { saveAuditTrail, AUDIT_TRAIL_CATEGORY, AUDIT_TRAIL_REMARK } = require("../models/userModel");
 
 const smartPingApi = async (mobileNumber, otp) => {
     try {
@@ -16,10 +17,12 @@ const smartPingApi = async (mobileNumber, otp) => {
 
         const response = await sendRequest({ method: thirdPartyApi.methods.GET, url, headers: { "Content-Type": "application/json" } });
 
+        const savingAuditTrail = await saveAuditTrail({ mobile: mobileNumber, uid: "", category: AUDIT_TRAIL_CATEGORY.SMS, remark: AUDIT_TRAIL_REMARK.SMART_PING_OTP });
+
         return { success: response?.statusCode == 200 };
 
     } catch (error) {
-        logger.error(error);
+        logger.error(`Error sending sms using smart ping :: ${error}`);
         throw error;
     }
 };
@@ -47,11 +50,11 @@ const gupshupApi = async (mobileNumber, otp) => {
             },
             useProxy: true,
         });
-
+        const savingAuditTrail = await saveAuditTrail({ mobile: mobileNumber, uid: "", category: AUDIT_TRAIL_CATEGORY.SMS, remark: AUDIT_TRAIL_REMARK.GUPSHUP_OTP });
         return { success: response?.response == 200 };
 
     } catch (error) {
-        logger.error(error);
+        logger.error(`Error sending sms using Gupshup Api :: ${error}`);
         throw error;
     }
 };

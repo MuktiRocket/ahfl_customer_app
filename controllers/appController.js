@@ -191,7 +191,7 @@ module.exports = {
           };
           return await sendRequest(payload);
         } catch (err) {
-          logger.error(`Outstanding fetch failed for ${loanAccountNumber}`, err);
+          logger.error(`Outstanding fetch failed for ${loanAccountNumber} :: ${err}`);
           return null;
         }
       };
@@ -268,7 +268,7 @@ module.exports = {
       });
 
     } catch (error) {
-      logger.error("getCustomerDetails error:", error);
+      logger.error(`getCustomerDetails error :: ${error}`);
       return res.status(500).json({ success: false, message: "Internal server error from get customer details route", });
     }
   },
@@ -283,7 +283,7 @@ module.exports = {
       };
       return await sendRequest(payload);
     } catch (err) {
-      logger.error(`Outstanding fetch failed for ${loanAccountNumber}`, err);
+      logger.error(`Outstanding fetch failed for ${loanAccountNumber} :: ${err}`);
       return null;
     }
   },
@@ -300,7 +300,7 @@ module.exports = {
 
       return res.status(200).json({ success: false, status: 200, message: applyLoanData?.message || "Something went wrong", data: { lead_id: applyLoanData?.leadId }, });
     } catch (error) {
-      logger.error(error);
+      logger.error(`Error fetching for apply loan :: ${error}`);
     }
   }
 

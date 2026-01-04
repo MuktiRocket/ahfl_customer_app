@@ -9,7 +9,7 @@ const generateToken = (data) => {
     const token = jwt.sign(data, process.env.SECRET_KEY, { expiresIn: "1h" });
     return token;
   } catch (error) {
-    logger.error("Error in generating JWT token :", error);
+    logger.error(`Error in generating JWT token :: ${error}`);
   }
 };
 
@@ -18,7 +18,7 @@ const hashing = async (data) => {
     const hashedData = await bcrypt.hash(data, saltRounds);
     return hashedData;
   } catch (error) {
-    logger.error("Error in hash the data:", error);
+    logger.error(`Error in hash the data :: ${error}`);
   }
 };
 

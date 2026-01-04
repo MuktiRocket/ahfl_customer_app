@@ -35,7 +35,7 @@ async function saveUserData({ mobileNumber, otp, customerDataArray, uid, loanAcc
       try {
         await pool.promise().execute(updateQuery, updateValues);
       } catch (error) {
-        logger.error("Error in running query of update in database");
+        logger.error(`Error in running query of update (saveUserData) in database :: ${error}`);
       }
 
       return;
@@ -402,12 +402,45 @@ async function saveFeedback(payload) {
 
     return result.insertId;
   } catch (error) {
-    logger.error("Error saving feedback:", error);
+    logger.error(`Error saving feedback :: ${error}`);
     throw error;
   }
 }
 
+async function saveAuditTrail(payload) {
+  const { mobile, uid, category, remark } = payload
+  try {
+    const query = `
+      INSERT INTO audit_trail (mobile, uid, category, remark, created_at, updated_at)
+      VALUES (?, ?, ?, ?, NOW(), NOW())
+    `;
 
+    const values = [
+      mobile || null,
+      uid || null,
+      category || null,
+      remark || null,
+    ];
 
+    const [result] = await pool.promise().execute(query, values);
+    return result.insertId;
 
-module.exports = { saveUserData, saveTransactionDetails, saveRequestPaymentDetails, saveResponsePaymentDetails, getCustomerDetails, insertPaymentDetails, updatePaymentDetailsByOrderId, saveApplyLoanData, updateApplyLoanLeadId, saveFeedback };
+  } catch (error) {
+    logger.error(`Error saving audit trail :: ${error}`);
+    throw error;
+  }
+}
+
+const AUDIT_TRAIL_CATEGORY = {
+  OTP_LOGIN: "otp-login",
+  DOB_LOGIN: "dob-login",
+  SMS: 'sms',
+  LOGOUT: "logout"
+}
+
+const AUDIT_TRAIL_REMARK = {
+  GUPSHUP_OTP: 'sent otp using GUPSHUP API',
+  SMART_PING_OTP: 'sent otp using SMART PING API'
+}
+
+module.exports = { saveUserData, saveTransactionDetails, saveRequestPaymentDetails, saveResponsePaymentDetails, getCustomerDetails, insertPaymentDetails, updatePaymentDetailsByOrderId, saveApplyLoanData, updateApplyLoanLeadId, saveFeedback, saveAuditTrail, AUDIT_TRAIL_CATEGORY, AUDIT_TRAIL_REMARK };

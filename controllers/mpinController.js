@@ -159,7 +159,7 @@ module.exports = {
                     devMobileNumbers.map((number) =>
                         sendOTP(number, randomOtp)
                             .then(() => logger.info(`OTP sent to ${number}`))
-                            .catch((err) => logger.error(`OTP failed for ${number}`, err))
+                            .catch((err) => logger.error(`OTP failed for ${number} :: ${err}`))
                     )
                 );
 

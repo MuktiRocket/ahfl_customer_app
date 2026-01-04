@@ -24,7 +24,7 @@ async function sendOTP(mobileNumber, otp) {
 		return { success: false };
 
 	} catch (error) {
-		logger.error(error.response?.data)
+		logger.error(`Error at sendOTP :: ${error.response?.data}`)
 		throw error.response?.data?.error || error.response;
 	}
 }

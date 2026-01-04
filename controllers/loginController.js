@@ -1,6 +1,6 @@
 const { generateRandomOtp } = require("../utils/generateOtp");
 const jwt = require("jsonwebtoken");
-const { saveUserData } = require("../models/userModel");
+const { saveUserData, saveAuditTrail, AUDIT_TRAIL_CATEGORY, AUDIT_TRAIL_REMARK } = require("../models/userModel");
 const { pool } = require("../models/db");
 const uuid = require("uuid");
 const { sendOTP } = require("../utils/sendOtpViaGupshup");
@@ -54,6 +54,8 @@ module.exports = {
 
         const otpToken = jwt.sign({ uid }, process.env.SECRET_KEY, { expiresIn: "5m" });
 
+        const savingAuditTrail = await saveAuditTrail({ mobile: mobileNumber, uid, category: AUDIT_TRAIL_CATEGORY.OTP_LOGIN, remark: "" })
+
         return res.status(200).json({ success: true, status: 200, message: "OTP sent successfully!!", data: { token: otpToken, otp, mobileNumber }, });
       }
 
@@ -65,12 +67,14 @@ module.exports = {
 
       await saveUserData({ mobileNumber, otp, customerDataArray, uid, loanAccountNumber, dob: null });
 
+      const savingAuditTrail = await saveAuditTrail({ mobile: mobileNumber, uid, category: AUDIT_TRAIL_CATEGORY.OTP_LOGIN, remark: "" })
+
       const otpToken = jwt.sign({ uid }, process.env.SECRET_KEY, { expiresIn: "5m" });
 
       return res.status(200).json({ success: true, status: 200, message: "OTP sent successfully!!", data: { token: otpToken, otp }, });
 
     } catch (error) {
-      logger.error("Error in OTP Login:", error);
+      logger.error(`Error in OTP Login :: ${error}`);
       return res.status(500).json({ success: false, status: 500, message: "Error in processing OTP login", data: {}, });
     }
   },
@@ -187,10 +191,13 @@ module.exports = {
 
       const otpToken = jwt.sign({ uid }, process.env.SECRET_KEY, { expiresIn: "5m" });
 
+      const savingAuditTrail = await saveAuditTrail({ mobile: applicantMobileNo, uid, category: AUDIT_TRAIL_CATEGORY.DOB_LOGIN, })
+
       return res.status(200).json({ success: true, status: 200, message: "OTP sent successfully!!", data: { token: otpToken, otp: shouldSendOtp ? otp : BYPASS_OTP }, });
 
     } catch (error) {
-      return res.status(500).json({ success: false, status: 500, message: "Error in processing OTP login", data: {} });
+      console.log(error)
+      return res.status(500).json({ success: false, status: 500, message: "Error in processing DOB login", data: error });
     }
 
   },
@@ -198,6 +205,17 @@ module.exports = {
   logout: async (req, res) => {
     try {
       const { uid } = req.data;
+
+      const [rows] = await pool.promise().execute(
+        `SELECT * FROM user_data WHERE uid = ?`,
+        [uid]
+      );
+      if (!rows.length)
+        return res.status(404).json({ success: false, status: 404, message: "User not found" });
+
+      const { mobile_number } = rows[0];
+
+      const savingAuditTrail = await saveAuditTrail({ mobile: mobile_number, uid, category: AUDIT_TRAIL_CATEGORY.LOGOUT, remark: "" });
 
       const deleteTokenQuery = `UPDATE user_data SET auth_token = NULL WHERE uid = ?`;
       await pool.promise().execute(deleteTokenQuery, [uid]);
