@@ -3,7 +3,6 @@ const jwt = require("jsonwebtoken");
 const verifyToken = (req, res, next) => {
   const authToken =
     req.headers.authorization && req.headers.authorization.split(" ")[1];
-
   if (!authToken) {
     return res.status(401).json({
       success: false,
@@ -22,7 +21,6 @@ const verifyToken = (req, res, next) => {
       });
     }
     req.data = decoded;
-    //console.log({ data: req.data })
     next();
   });
 };
