@@ -5,6 +5,7 @@ const {
 } = require("../middlewares/fetchLoanApplicationStatus");
 const {
   createApplyLoanLeadBank,
+  createTopUpApplyLoanLeadBank,
 } = require("../middlewares/createApplyLoanLeadBank");
 const { verifyToken } = require("../middlewares/verifyToken");
 const { saveTransactionDetails } = require("../models/userModel");
@@ -18,7 +19,7 @@ const {
 const {
   getTokenForLetterGeneration,
 } = require("../middlewares/letterGenarate/getTokenForLetterGeneration");
-const { validateCRMRequest, validateLetterGenerationRequest } = require("../validations/appControllerValidations");
+const { validateCRMRequest, validateLetterGenerationRequest, validateTopUpApplyLoanRequest } = require("../validations/appControllerValidations");
 const validate = require("../middlewares/ValidationMiddleware");
 
 const router = express.Router();
@@ -29,38 +30,7 @@ router.get("/getCustomerDetails", verifyToken, appController.getCustomerDetailsM
 
 router.post("/applyLoan", createApplyLoanLeadBank, appController.applyLoan);
 
-router.post(
-  "/applyTopUpLoan",
-  verifyToken,
-  createApplyLoanLeadBank,
-  (req, res) => {
-    const applyLoanData = JSON.parse(req.apiData);
-    if (
-      applyLoanData &&
-      applyLoanData.lead_id &&
-      applyLoanData.status_code === "0001"
-    ) {
-      const leadId = applyLoanData.lead_id;
-      return res.status(200).json({
-        success: true,
-        status: 200,
-        message: applyLoanData.message,
-        data: {
-          lead_id: leadId,
-        },
-      });
-    } else {
-      return res.status(200).json({
-        success: false,
-        status: 200,
-        message: applyLoanData.message,
-        data: {
-          lead_id: applyLoanData.leadId,
-        },
-      });
-    }
-  }
-);
+router.post("/applyTopUpLoan", verifyToken, validate(validateTopUpApplyLoanRequest), createTopUpApplyLoanLeadBank, appController.applyTopUpLoan);
 
 router.get("/loanApplicationStatus", async (req, res) => {
   const { applicationId } = req.query;

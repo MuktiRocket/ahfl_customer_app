@@ -356,6 +356,68 @@ async function saveApplyLoanData(payload) {
   }
 }
 
+async function saveTopUpApplyLoanData(payload) {
+  try {
+    const { leadActionFlag, LeadData } = payload;
+
+    const { LeadSource, Name, LastName, EmailID, MobileNumber, DOB, Pincode, State, District, Branch, ProductType, LoanAmount, PeriodLoanWanted, PreferredLanguage, InputColumn1, } = LeadData || {};
+
+    const insertQuery = `
+      INSERT INTO top_up_apply_loan_data (
+        leadActionFlag,
+        leadSource,
+        name,
+        lastName,
+        email_id,
+        mobile_number,
+        dob,
+        pincode,
+        state,
+        district,
+        branch,
+        product_type,
+        loan_amount,
+        period_loan_wanted,
+        preferred_language,
+        input_column_1,
+        create_at,
+        update_at
+      )
+      VALUES (
+        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW()
+      )
+    `;
+
+    const insertValues = [
+      leadActionFlag || null,
+      LeadSource || null,
+      Name || null,
+      LastName || null,
+      EmailID || null,
+      MobileNumber || null,
+      DOB || null,
+      Pincode || null,
+      State || null,
+      District || null,
+      Branch || null,
+      ProductType || null,
+      LoanAmount || null,
+      PeriodLoanWanted || null,
+      PreferredLanguage || null,
+      InputColumn1 || null,
+    ];
+
+    const [result] = await pool.promise().execute(insertQuery, insertValues);
+
+    return result.insertId;
+
+  } catch (error) {
+    logger.error(`Error saving top-up apply loan data :: ${error}`);
+    throw error;
+  }
+}
+
+
 async function updateApplyLoanLeadId({ id, lead_id, category }) {
   try {
     const updateQuery = `
@@ -365,6 +427,25 @@ async function updateApplyLoanLeadId({ id, lead_id, category }) {
     `;
 
     const updateValues = [lead_id || null, category || null, id];
+
+    await pool.promise().execute(updateQuery, updateValues);
+    return true;
+
+  } catch (error) {
+    console.error("Error updating apply loan lead_id:", error);
+    throw error;
+  }
+}
+
+async function updateTopUpApplyLoanLeadId({ id, lead_id }) {
+  try {
+    const updateQuery = `
+      UPDATE top_up_apply_loan_data
+      SET lead_id = ?
+      WHERE id = ?
+    `;
+
+    const updateValues = [lead_id || null, id];
 
     await pool.promise().execute(updateQuery, updateValues);
     return true;
@@ -443,4 +524,4 @@ const AUDIT_TRAIL_REMARK = {
   SMART_PING_OTP: 'sent otp using SMART PING API'
 }
 
-module.exports = { saveUserData, saveTransactionDetails, saveRequestPaymentDetails, saveResponsePaymentDetails, getCustomerDetails, insertPaymentDetails, updatePaymentDetailsByOrderId, saveApplyLoanData, updateApplyLoanLeadId, saveFeedback, saveAuditTrail, AUDIT_TRAIL_CATEGORY, AUDIT_TRAIL_REMARK };
+module.exports = { saveUserData, saveTransactionDetails, saveRequestPaymentDetails, saveResponsePaymentDetails, getCustomerDetails, insertPaymentDetails, updatePaymentDetailsByOrderId, saveApplyLoanData, updateApplyLoanLeadId, saveFeedback, saveAuditTrail, AUDIT_TRAIL_CATEGORY, AUDIT_TRAIL_REMARK, saveTopUpApplyLoanData, updateTopUpApplyLoanLeadId };

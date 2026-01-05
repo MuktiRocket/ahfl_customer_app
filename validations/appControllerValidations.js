@@ -43,4 +43,61 @@ const validateLetterGenerationRequest = Joi.object({
     .required(),
 });
 
-module.exports = { validateCRMRequest, validateLetterGenerationRequest };
+const validateTopUpApplyLoanRequest = Joi.object({
+  leadActionFlag: Joi.string()
+    .valid("C", "U")
+    .required(),
+
+  LeadData: Joi.object({
+    LeadSource: Joi.string().trim().required(),
+
+    Name: Joi.string()
+      .trim()
+      .min(2)
+      .required(),
+
+    LastName: Joi.string()
+      .trim()
+      .min(1)
+      .required(),
+
+    EmailID: Joi.string()
+      .email()
+      .required(),
+
+    MobileNumber: Joi.string()
+      .pattern(/^[6-9]\d{9}$/)
+      .required(),
+
+    DOB: Joi.string(),
+
+    Pincode: Joi.string()
+      .pattern(/^\d{6}$/)
+      .required(),
+
+    State: Joi.string().required(),
+
+    District: Joi.string().required(),
+
+    Branch: Joi.string().required(),
+
+    ProductType: Joi.string().required(),
+
+    LoanAmount: Joi.string()
+      .pattern(/^\d+$/)
+      .required(),
+
+    PeriodLoanWanted: Joi.string()
+      .pattern(/^\d+$/)
+      .required(),
+
+    PreferredLanguage: Joi.string().required(),
+
+    InputColumn1: Joi.string()
+      .trim()
+      .required(),
+  }).required(),
+});
+
+
+module.exports = { validateCRMRequest, validateLetterGenerationRequest, validateTopUpApplyLoanRequest };

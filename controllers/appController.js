@@ -7,9 +7,10 @@ const FormData = require("form-data");
 const qs = require("qs");
 const { saveCRMRequestData, updateCRMRequestDataByTicketId } = require("../models/crmDataModel");
 const { sendRequest } = require("../utils/thirdPartyApiService");
-const { updateApplyLoanLeadId } = require("../models/userModel");
+const { updateApplyLoanLeadId, updateTopUpApplyLoanLeadId } = require("../models/userModel");
 const { logger } = require("../utils/logger");
 const { formatLoanAccountNumber } = require("../utils/generateOtp");
+const { LEAD_CATEGORY } = require("../middlewares/createApplyLoanLeadBank");
 
 const PROB_SUMMARY_FOR_EMAIL = "Updation/Rectification of Email ID";
 const PROB_SUMMARY_FOR_MOBILE = "Updation/Rectification of Mobile number";
@@ -288,18 +289,13 @@ module.exports = {
     }
   },
 
-  LEAD_CATEGORY: {
-    LOAN_REQUEST: "loan-request",
-    TOP_UP_LOAN_REQUEST: "top-up-loan-request",
-  },
-
   applyLoan: async (req, res) => {
     try {
       const applyLoanData = req.apiData;
       const loanId = req.loanId;
 
       if (applyLoanData?.lead_id && applyLoanData?.status_code === "0001") {
-        await updateApplyLoanLeadId({ id: loanId, lead_id: applyLoanData.lead_id, category: this.LEAD_CATEGORY.LOAN_REQUEST })
+        await updateApplyLoanLeadId({ id: loanId, lead_id: applyLoanData.lead_id, category: LEAD_CATEGORY.LOAN_REQUEST })
         return res.status(200).json({ success: true, status: 200, message: applyLoanData.message, data: { lead_id: applyLoanData.lead_id }, });
       }
 
@@ -311,18 +307,17 @@ module.exports = {
 
   applyTopUpLoan: async (req, res) => {
     try {
-      const applyLoanData = JSON.parse(req.apiData);
+      const applyLoanData = req.apiData;
       const loanId = req.loanId;
-
       if (applyLoanData?.lead_id && applyLoanData?.status_code === "0001") {
-        await updateApplyLoanLeadId({ id: loanId, lead_id: applyLoanData.lead_id, category: LEAD_CATEGORY.TOP_UP_LOAN_REQUEST })
+        await updateTopUpApplyLoanLeadId({ id: loanId, lead_id: applyLoanData.lead_id })
         return res.status(200).json({ success: true, status: 200, message: applyLoanData.message, data: { lead_id: applyLoanData.lead_id } });
       }
 
       return res.status(200).json({ success: false, status: 200, message: applyLoanData.message, data: { lead_id: applyLoanData.leadId } });
 
     } catch (error) {
-      logger.error(`Error fetching for apply loan :: ${error}`);
+      logger.error(`Error fetching for Top up apply loan :: ${error}`);
     }
   }
 
