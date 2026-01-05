@@ -288,17 +288,39 @@ module.exports = {
     }
   },
 
+  LEAD_CATEGORY: {
+    LOAN_REQUEST: "loan-request",
+    TOP_UP_LOAN_REQUEST: "top-up-loan-request",
+  },
+
   applyLoan: async (req, res) => {
     try {
       const applyLoanData = req.apiData;
       const loanId = req.loanId;
 
       if (applyLoanData?.lead_id && applyLoanData?.status_code === "0001") {
-        await updateApplyLoanLeadId({ id: loanId, lead_id: applyLoanData.lead_id })
+        await updateApplyLoanLeadId({ id: loanId, lead_id: applyLoanData.lead_id, category: this.LEAD_CATEGORY.LOAN_REQUEST })
         return res.status(200).json({ success: true, status: 200, message: applyLoanData.message, data: { lead_id: applyLoanData.lead_id }, });
       }
 
       return res.status(200).json({ success: false, status: 200, message: applyLoanData?.message || "Something went wrong", data: { lead_id: applyLoanData?.leadId }, });
+    } catch (error) {
+      logger.error(`Error fetching for apply loan :: ${error}`);
+    }
+  },
+
+  applyTopUpLoan: async (req, res) => {
+    try {
+      const applyLoanData = JSON.parse(req.apiData);
+      const loanId = req.loanId;
+
+      if (applyLoanData?.lead_id && applyLoanData?.status_code === "0001") {
+        await updateApplyLoanLeadId({ id: loanId, lead_id: applyLoanData.lead_id, category: LEAD_CATEGORY.TOP_UP_LOAN_REQUEST })
+        return res.status(200).json({ success: true, status: 200, message: applyLoanData.message, data: { lead_id: applyLoanData.lead_id } });
+      }
+
+      return res.status(200).json({ success: false, status: 200, message: applyLoanData.message, data: { lead_id: applyLoanData.leadId } });
+
     } catch (error) {
       logger.error(`Error fetching for apply loan :: ${error}`);
     }

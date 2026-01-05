@@ -356,18 +356,17 @@ async function saveApplyLoanData(payload) {
   }
 }
 
-async function updateApplyLoanLeadId({ id, lead_id }) {
+async function updateApplyLoanLeadId({ id, lead_id, category }) {
   try {
     const updateQuery = `
       UPDATE apply_loan_data
-      SET lead_id = ?, updated_at = NOW()
+      SET lead_id = ?, category = ?, updated_at = NOW()
       WHERE id = ?
     `;
 
-    const updateValues = [lead_id || null, id];
+    const updateValues = [lead_id || null, category || null, id];
 
     await pool.promise().execute(updateQuery, updateValues);
-
     return true;
 
   } catch (error) {
@@ -375,6 +374,7 @@ async function updateApplyLoanLeadId({ id, lead_id }) {
     throw error;
   }
 }
+
 
 async function saveFeedback(payload) {
   try {
