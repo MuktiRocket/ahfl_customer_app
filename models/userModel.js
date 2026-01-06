@@ -286,23 +286,16 @@ async function updatePaymentDetailsByOrderId(payload) {
 }
 
 async function getCustomerDetails(uid) {
+  const [rows] = await pool
+    .promise()
+    .execute(`SELECT customer_data FROM user_data WHERE uid = ?`, [uid]);
 
-  const query = `SELECT * FROM user_data WHERE uid = ?`;
-  const [userDataRows] = await pool.promise().execute(query, [uid]);
+  if (!rows.length || !rows[0]?.customer_data) return null;
 
-  // if (userDataRows.length === 0) {
-  //   return res.json({
-  //     success: false,
-  //     status: 401,
-  //     message: "Invalid creadentials",
-  //     data: {},
-  //   });
-  // }
-  //console.log({ userDataRows })
-  const { customer_data } = userDataRows[0];
-  return JSON.parse(customer_data)[0]
-  // const customerNumber = JSON.parse(customer_data)[0].customerNumber;
+  const parsedData = JSON.parse(rows[0].customer_data);
+  return Array.isArray(parsedData) ? parsedData[0] : parsedData;
 }
+
 
 async function saveApplyLoanData(payload) {
   try {
