@@ -8,16 +8,25 @@ const crypto = require('crypto');
 const thirdPartyApi = require("../utils/thirdPartyApi");
 const apiFetcher = require("../utils/apiFetcher");
 const request = require('request');
-const { sendRequest } = require('../utils/thirdPartyApiService');
 const { verifyTransactionResponse } = require("../utils/verifyTransactionResponse");
 const responseSender = require("../utils/responseSender");
 const responseMessage = require("../utils/responseMessage");
+const { sendRequest } = require("../utils/thirdPartyApiService");
 const { logger } = require("../utils/logger");
 
 const PAYTM_APIS = {
     PAYTM_CALLBACK_API: process.env.PAYTM_CALLBACK_API,
-    PAYTM_INITIATE_PAYMENT: process.env.PAYTM_INITIATE_PAYMENT
+    PAYTM_INITIATE_PAYMENT: process.env.PAYTM_INITIATE_PAYMENT,
+    WEBSITE_APP: process.env.WEBSITE_APP,
+    MID: process.env.MID,
+    MERCHANT_KEY: process.env.MERCHANT_KEY
 }
+
+const PAYTM_CONSTANTS = {
+    REQUEST_TYPE: "Payment",
+    CURRENCY: "INR"
+}
+
 
 module.exports = {
 
@@ -26,33 +35,41 @@ module.exports = {
             const { uid } = req.data;
             const { paymentAmount, paymentDesc, paymentType, loanAccountNumber } = req.body;
 
-            const { applicationNo, applicantMobileNo, customerNumber, dob } =
+            const { applicationNo, applicantMobileNo, customerNumber, crmClientID, dob } =
                 await getCustomerDetails(uid);
 
             const orderId = `AHLFORDERID_${Math.floor(100000 + Math.random() * 900000)}`;
             const custId = `CUST_${Math.floor(100000 + Math.random() * 900000)}`;
 
             const paytmBody = {
-                requestType: "Payment",
-                mid: process.env.MID,
-                websiteName: process.env.WEBSITE_APP,
+                requestType: PAYTM_CONSTANTS.REQUEST_TYPE,
+                mid: PAYTM_APIS.MID,
+                websiteName: PAYTM_APIS.WEBSITE_APP,
                 orderId,
                 callbackUrl: `${PAYTM_APIS.PAYTM_CALLBACK_API}?ORDER_ID=${orderId}`,
-                txnAmount: { value: paymentAmount, currency: "INR" },
+                txnAmount: { value: paymentAmount, currency: PAYTM_CONSTANTS.CURRENCY },
                 userInfo: { custId },
                 paymentDesc
             };
 
             const checksum = await Paytm.generateSignature(
                 JSON.stringify(paytmBody),
-                process.env.MERCHANT_KEY
+                PAYTM_APIS.MERCHANT_KEY
             );
 
+            const paytmPayload = JSON.stringify({
+                body: paytmBody,
+                head: { signature: checksum }
+            });
+
             const payload = {
-                method: "POST",
+                method: thirdPartyApi.methods.POST,
                 url: `${PAYTM_APIS.PAYTM_INITIATE_PAYMENT}?mid=${process.env.MID}&orderId=${orderId}`,
-                headers: { "Content-Type": "application/json" },
-                body: { body: paytmBody, head: { signature: checksum } },
+                headers: {
+                    "Content-Type": "application/json",
+                    "Content-Length": Buffer.byteLength(paytmPayload)
+                },
+                data: paytmPayload,
             }
 
             const paytmResponse = await sendRequest(payload);
