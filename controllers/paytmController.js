@@ -125,229 +125,125 @@ module.exports = {
 
     postResponsePayment: async (req, res) => {
         try {
-            const lang = req.headers['language'] || req.headers['Language'];
-            const { isDev, paymentType, loanAccountNumber, isUAT } = req.body
-            //console.log({ paymentType, loanAccountNumber })
+            const lang = req.headers.language || req.headers.Language;
+            const { uid } = req.data;
+            const { isDev, isUAT, paymentType, loanAccountNumber } = req.body;
 
-            const { uid } = req.data
-            const query = `SELECT * FROM user_data WHERE uid = ?`;
-            const [userDataRows] = await pool.promise().execute(query, [uid]);
+            const [[userRow]] = await pool.promise().execute(
+                `SELECT auth_token, customer_data FROM user_data WHERE uid = ?`,
+                [uid]
+            );
 
-            if (userDataRows.length === 0 || userDataRows[0].auth_token === null) {
-                return res.status(401).json({
-                    success: false,
-                    message: "Invalid auth token or expired",
-                });
-            }
+            if (!userRow?.auth_token)
+                return res.status(401).json({ success: false, message: "Invalid auth token or expired" });
 
-            const customerDetails = JSON.parse(userDataRows[0]?.customer_data)
+            const customers = Array.isArray(JSON.parse(userRow.customer_data))
+                ? JSON.parse(userRow.customer_data)
+                : [JSON.parse(userRow.customer_data)];
 
-            if (!Array.isArray(customerDetails)) {
-                customerDetails = [customerDetails];
-            }
+            const user = customers.find(u => u.loanAccountNumber === loanAccountNumber);
 
-            const user = customerDetails.find(u => u.loanAccountNumber === loanAccountNumber)
-            //console.log({ user })
-            if (!user) {
-                return res.status(404).json({
-                    success: false,
-                    message: "Loan account number not found",
-                });
-            }
+            if (!user)
+                return res.status(404).json({ success: false, message: "Loan account number not found" });
 
+            const {
+                responseCode, responseMsg, responseStatus, bankName, bankTransactionId,
+                currency, deviceId, gatewayName, orderId, mode,
+                transactionAmount, transactionId, CHECKSUMHASH, paytmParam
+            } = req.body;
+
+            const responseObj = { responseCode, responseMsg, responseStatus, bankName, bankTransactionId, currency, deviceId, gatewayName, mode, transactionAmount, transactionId };
+
+            /* ===================== UAT FLOW ===================== */
             if (isUAT) {
-                const { responseCode, responseMsg, responseStatus, bankName, bankTransactionId, currency, deviceId, gatewayName, orderId, mode, transactionAmount, transactionId, CHECKSUMHASH } = req.body;
-                const responseObj = { responseCode, responseMsg, responseStatus, bankName, bankTransactionId, currency, deviceId, gatewayName, mode, transactionAmount, transactionId }
 
-                //need to check the data tampering while paytm payment
-                // async function handleTransaction(responseObj) {
-                //   try {
-                //     const result = await verifyTransactionResponse(responseObj);
-                //     console.log({ result });
-                //     const isValidChecksum = result.isValid;
-                //     console.log("Is valid checksum:", isValidChecksum);
-                //     if (isValidChecksum) {
-                //       console.log("Transaction status:", result.status);
-                //     } else {
-                //       console.log("Invalid checksum.");
-                //     }
-                //   } catch (error) {
-                //     console.error("Error:", error);
-                //   }
-                // }
-                // handleTransaction(responseObj);
-
-
-                if (responseStatus === 'TXN_SUCCESS' && paymentType === 'emi') {
-                    const requestBody = {
-                        "MARCHANT_NAME": "Aadhar Housing Finance Limited",
-                        "APPLICATION_NUMBER": user?.loanAccountNumber,
-                        "MOBILE_NUMBER": user?.applicantMobileNo,
-                        "CUTOMER_NAME": user?.applicantFullName,
-                        "AMOUNT": transactionAmount,
-                        "PAYMENTBANK": "BBPS",
-                        "PAYMENTMODE": mode,
-                        "PAYTMORDERID": orderId,
-                        "PAY_SOURCE": "PAYTW"
+                if (responseStatus === "TXN_SUCCESS" && paymentType === "emi") {
+                    const emiRequest = {
+                        MARCHANT_NAME: "Aadhar Housing Finance Limited",
+                        APPLICATION_NUMBER: user.loanAccountNumber,
+                        MOBILE_NUMBER: user.applicantMobileNo,
+                        CUTOMER_NAME: user.applicantFullName,
+                        AMOUNT: transactionAmount,
+                        PAYMENTBANK: "BBPS",
+                        PAYMENTMODE: mode,
+                        PAYTMORDERID: orderId,
+                        PAY_SOURCE: "PAYTW"
+                    };
+                    const payload = {
+                        method: thirdPartyApi.postEmiPayment.method,
+                        url: thirdPartyApi.postEmiPayment.endpoint,
+                        headers: thirdPartyApi.postEmiPayment.headers,
+                        data: JSON.stringify(emiRequest)
                     }
 
-                    try {
-                        // const result = await apiFetcher({
-                        //   url: thirdPartyApi.postEmiPayment.endpoint,
-                        //   method: thirdPartyApi.postEmiPayment.method,
-                        //   headers: thirdPartyApi.postEmiPayment.headers,
-                        //   data: requestBody
-                        // })
-                        // console.log({ result })
-                        const fetchData = (callback) => {
-                            const options = {
-                                url: thirdPartyApi.postEmiPayment.endpoint,
-                                method: thirdPartyApi.postEmiPayment.method,
-                                headers: thirdPartyApi.postEmiPayment.headers,
-                                body: JSON.stringify(requestBody)
-                            };
-
-                            request(options, function (error, response, body) {
-                                if (error) {
-                                    callback(error, null);
-                                } else {
-                                    callback(null, body);
-                                }
-                            });
-                        };
-
-                        fetchData((error, apiResponse) => {
-                            if (error) {
-                                console.log({ error });
-                            } else {
-                                console.log(apiResponse);
-                            }
-                        });
-
-                    } catch (error) {
-                        console.log("Error in calling Postin api", error)
-                    }
+                    await sendRequest(payload);
                 }
 
-                const query = `SELECT salt FROM request_payment WHERE order_id = ?`;
-                const [userDataRows] = await pool.promise().execute(query, [orderId]);
-                //console.log({ userDataRows })
-                const salt = userDataRows[0].salt
+                const [[saltRow]] = await pool.promise().execute(
+                    `SELECT salt FROM request_payment WHERE order_id = ?`,
+                    [orderId]
+                );
 
-                const encryptResponseData = encryptData.encrypt(responseObj, salt)
-                //console.log({ encryptResponseData })
+                const encryptedResponse = encryptData.encrypt(responseObj, saltRow.salt);
 
-                const finalEncryptedData = {
-                    ...encryptResponseData,
-                    orderId: orderId,
-                    salt: salt
-                }
+                await saveResponsePaymentDetails({ ...encryptedResponse, orderId, salt: saltRow.salt });
 
-                const paymentDetailsPayload = {
-                    orderId: orderId,
-                    responseCode: responseCode,
-                    responseMsg: responseMsg,
-                    responseStatus: responseStatus,
+                await updatePaymentDetailsByOrderId({
+                    orderId,
+                    responseCode,
+                    responseMsg,
+                    responseStatus,
                     txnId: bankTransactionId,
-                    mode: mode,
-                };
-                console.log(paymentDetailsPayload)
-                await saveResponsePaymentDetails(finalEncryptedData);
-                await updatePaymentDetailsByOrderId(paymentDetailsPayload);
+                    mode
+                });
 
-                return responseSender(res, responseMessage.completeTransaction.statusCode, responseMessage.completeTransaction.description[lang], true)
-                // res.status(200).json({ success: true, status: 200, message: "Your transaction is completed" });
-
-            } else {
-                /*const { uid } = req.data;
-                console.log(2222222, req.body)
-                const { responseCode, responseMsg, responseStatus, bankName, bankTransactionId, currency, deviceId, gatewayName, orderId, mode, transactionAmount, transactionId, checkSumHash } = req.body;
-            	
-                const response = {   responseCode,responseMsg,  responseStatus,  bankName, bankTransactionId, currency, deviceId, gatewayName, mode, transactionAmount, transactionId, checkSumHash }
-                const responseObj = { RESPCODE: responseCode, RESPMSG:responseMsg, STATUS: responseStatus, BANKNAME: bankName, BANKTXNID:bankTransactionId, CURRENCY: currency, GATEWAYNAME: gatewayName, ORDERID: orderId, PAYMENTMODE: mode, TXNAMOUNT: transactionAmount, TXNID: transactionId, CHECKSUMHASH: checkSumHash }
-                //need to check the data tampering while paytm payment
-                const isValildChecksum = verifyTransactionResponse(responseObj)
-                //console.log({ isValildChecksum })
-
-                const salt = crypto.randomBytes(16).toString('hex');
-                //console.log({ salt })
-
-                const encryptResponseData = encryptData.encrypt(response, salt)
-                //console.log({ encryptResponseData })
-
-                const finalEncryptedData = {
-                    ...encryptResponseData,
-                    orderId: orderId,
-                    salt: salt
-                }
-                await saveResponsePaymentDetails(finalEncryptedData)
-
-                return responseSender(res, responseMessage.completeTransaction.statusCode, responseMessage.completeTransaction.description[lang], true)
-                // res.status(200).json({ success: true, status: 200, message: "Your transaction is completed" });*/
-                const { responseCode, responseMsg, responseStatus, bankName, bankTransactionId, currency, deviceId, gatewayName, orderId, mode, transactionAmount, transactionId, CHECKSUMHASH, paytmParam } = req.body;
-                const responseObj = { responseCode, responseMsg, responseStatus, bankName, bankTransactionId, currency, deviceId, gatewayName, mode, transactionAmount, transactionId }
-
-                async function handleTransaction(paytmParam, paytmChecksum) {
-                    try {
-                        /* const result = await verifyTransactionResponse(paytmParam);
-                         console.log("valid",{result });
-                        const isValidChecksum = result.isValid;
-                        console.log("Is valid checksum:", isValidChecksum);
-                        if (isValidChecksum) {
-                          console.log("Transaction status:", result.status);
-                         } else {
-                         console.log("Invalid checksum.");
-                         }
-                         */
-
-                        const isVerify = Paytm.verifySignature(
-                            paytmParam, process.env.MERCHANT_KEY, paytmChecksum
-                        )
-                        if (isVerify) {
-                            console.log("Transaction success:");
-                        } else {
-                            console.log("Invalid checksum.");
-                        }
-
-                    } catch (error) {
-                        console.error("Error:", error);
-                    }
-                }
-                const paytmChecksum = paytmParam.CHECKSUMHASH
-                delete paytmParam.CHECKSUMHASH
-                handleTransaction(paytmParam, paytmChecksum);
-
-                const salt = crypto.randomBytes(16).toString('hex');
-                //console.log({ salt })
-
-                const encryptResponseData = encryptData.encrypt(responseObj, salt)
-                //console.log({ encryptResponseData })
-
-                const finalEncryptedData = {
-                    ...encryptResponseData,
-                    orderId: orderId,
-                    salt: salt
-                }
-
-                const paymentDetailsPayload = {
-                    orderId: orderId,
-                    responseCode: responseCode,
-                    responseMsg: responseMsg,
-                    responseStatus: responseStatus,
-                    txnId: bankTransactionId,
-                    mode: mode,
-                };
-                console.log(paymentDetailsPayload)
-                await saveResponsePaymentDetails(finalEncryptedData);
-                await updatePaymentDetailsByOrderId(paymentDetailsPayload);
-
-                if (responseCode != "01")
-                    return responseSender(res, responseMessage.inCompleteTransaction.statusCode, responseMessage.inCompleteTransaction.description[lang], true)
-                return responseSender(res, responseMessage.completeTransaction.statusCode, responseMessage.completeTransaction.description[lang], true)
+                return responseSender(
+                    res,
+                    responseMessage.completeTransaction.statusCode,
+                    responseMessage.completeTransaction.description[lang],
+                    true
+                );
             }
+
+            /* ===================== PROD FLOW ===================== */
+
+            if (paytmParam) {
+                const checksum = paytmParam.CHECKSUMHASH;
+                delete paytmParam.CHECKSUMHASH;
+                Paytm.verifySignature(paytmParam, process.env.MERCHANT_KEY, checksum);
+            }
+
+            const salt = crypto.randomBytes(16).toString("hex");
+            const encryptedResponse = encryptData.encrypt(responseObj, salt);
+
+            await saveResponsePaymentDetails({ ...encryptedResponse, orderId, salt });
+
+            await updatePaymentDetailsByOrderId({
+                orderId,
+                responseCode,
+                responseMsg,
+                responseStatus,
+                txnId: bankTransactionId,
+                mode
+            });
+
+            if (responseCode !== "01")
+                return responseSender(
+                    res,
+                    responseMessage.inCompleteTransaction.statusCode,
+                    responseMessage.inCompleteTransaction.description[lang],
+                    true
+                );
+
+            return responseSender(
+                res,
+                responseMessage.completeTransaction.statusCode,
+                responseMessage.completeTransaction.description[lang],
+                true
+            );
 
         } catch (error) {
-            console.error("Error while saving response payment details:", error);
+            logger.error(`Error while saving response payment details :: ${error}`);
             res.status(500).json({ success: false, status: 500, message: "Internal server error" });
         }
     },
