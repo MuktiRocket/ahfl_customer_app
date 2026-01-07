@@ -24,45 +24,15 @@ const validate = require("../middlewares/ValidationMiddleware");
 
 const router = express.Router();
 
-router.get("/getCustomerDetails", verifyToken, appController.getCustomerDetailsModified);
+// router.get("/getCustomerDetails", verifyToken, appController.getCustomerDetailsModified);
 
-// router.get("/getCustomerDetails", verifyToken, appController.getCustomerDetails)
+router.get("/getCustomerDetails", verifyToken, appController.getCustomerDetails)
 
 router.post("/applyLoan", createApplyLoanLeadBank, appController.applyLoan);
 
 router.post("/applyTopUpLoan", verifyToken, validate(validateTopUpApplyLoanRequest), createTopUpApplyLoanLeadBank, appController.applyTopUpLoan);
 
-router.get("/loanApplicationStatus", async (req, res) => {
-  const { applicationId } = req.query;
-
-  try {
-    const result = await apiFetcher({
-      method: thirdPartyApi.getLoanApplicationStatus.method,
-      url: thirdPartyApi.getLoanApplicationStatus.endpoint,
-      headers: thirdPartyApi.getLoanApplicationStatus.headers,
-      data: JSON.stringify({ applicationId }),
-      //useReverseProxy: true,  // Use reverse proxy
-      //proxy: 'http://10.130.1.1:8080',  // Custom proxy URL
-    });
-    console.log("loan application issue", { result });
-
-    const applicationStatusData = JSON.parse(result);
-
-    res.json({
-      success: true,
-      status: 200,
-      message: "Successfully fetched application status",
-      data: applicationStatusData,
-    });
-  } catch (error) {
-    //console.log("Error in fetching data from server:", error);
-    res.status(500).json({
-      success: false,
-      status: 500,
-      message: "Error occured while fetching loan application status",
-    });
-  }
-});
+router.get("/loanApplicationStatus", appController.loanApplicationStatus);
 
 router.post("/letterGeneration", verifyToken, validate(validateLetterGenerationRequest), appController.getLetterGenerationData);
 

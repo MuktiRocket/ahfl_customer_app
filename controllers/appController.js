@@ -174,9 +174,6 @@ module.exports = {
         [uid]
       );
 
-      if (!rows.length || !rows[0].auth_token)
-        return res.status(401).json({ success: false, message: "Invalid auth token or expired" });
-
       // ---------- CUSTOMER DATA ----------
       const parsedData = JSON.parse(rows[0].customer_data);
       const customerList = Array.isArray(parsedData) ? parsedData : [parsedData];
@@ -231,9 +228,6 @@ module.exports = {
         `SELECT customer_data, auth_token FROM user_data WHERE uid = ?`,
         [uid]
       );
-
-      if (!rows.length || !rows[0].auth_token)
-        return res.status(401).json({ success: false, message: "Invalid auth token or expired" });
 
       // ---------- CUSTOMER DATA (FILTER CLOSED LOANS) ----------
       const parsedData = JSON.parse(rows[0].customer_data).filter(
@@ -318,6 +312,25 @@ module.exports = {
 
     } catch (error) {
       logger.error(`Error fetching for Top up apply loan :: ${error}`);
+    }
+  },
+
+  loanApplicationStatus: async (req, res) => {
+    try {
+      const { applicationId } = req.query;
+
+      const payload = {
+        method: thirdPartyApi.getLoanApplicationStatus.method,
+        url: thirdPartyApi.getLoanApplicationStatus.endpoint,
+        headers: thirdPartyApi.getLoanApplicationStatus.headers,
+        data: JSON.stringify({ applicationId })
+      };
+      const response = await sendRequest(payload);
+      res.json({ success: true, status: 200, message: "Successfully fetched application status", data: response });
+
+    } catch (error) {
+      logger.error(`Error while fetching loan application status :: ${error}`);
+      res.status(500).json({ success: false, status: 500, message: "Error occured while fetching loan application status" });
     }
   }
 
