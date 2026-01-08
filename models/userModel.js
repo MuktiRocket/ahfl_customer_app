@@ -373,8 +373,8 @@ async function saveTopUpApplyLoanData(payload) {
         period_loan_wanted,
         preferred_language,
         input_column_1,
-        create_at,
-        update_at
+        created_at,
+        updated_at
       )
       VALUES (
         ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW()
