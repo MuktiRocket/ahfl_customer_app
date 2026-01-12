@@ -180,7 +180,7 @@ module.exports = {
 
       const loanOutstanding = await Promise.all(
         customerList.map(async ({ loanAccountNumber }) => ({
-          outstandingData: await this.fetchOutstanding(loanAccountNumber),
+          outstandingData: await module.exports.fetchOutstanding(loanAccountNumber),
         }))
       );
 
