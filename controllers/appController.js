@@ -178,25 +178,9 @@ module.exports = {
       const parsedData = JSON.parse(rows[0].customer_data);
       const customerList = Array.isArray(parsedData) ? parsedData : [parsedData];
 
-      // ---------- FETCH OUTSTANDING USING sendRequest ----------
-      const fetchOutstanding = async (loanAccountNumber) => {
-        try {
-          const payload = {
-            method: thirdPartyApi.getLoanOutstanding.method,
-            url: thirdPartyApi.getLoanOutstanding.endpoint,
-            headers: thirdPartyApi.getLoanOutstanding.headers,
-            data: { lm_applno: formatLoanAccountNumber(loanAccountNumber) },
-          };
-          return await sendRequest(payload);
-        } catch (err) {
-          logger.error(`Outstanding fetch failed for ${loanAccountNumber} :: ${err}`);
-          return null;
-        }
-      };
-
       const loanOutstanding = await Promise.all(
         customerList.map(async ({ loanAccountNumber }) => ({
-          outstandingData: await fetchOutstanding(loanAccountNumber),
+          outstandingData: await this.fetchOutstanding(loanAccountNumber),
         }))
       );
 
