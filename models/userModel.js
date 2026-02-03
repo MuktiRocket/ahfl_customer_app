@@ -3,11 +3,14 @@ const { logger } = require("../utils/logger");
 
 async function saveUserData({ mobileNumber, otp, customerDataArray, uid, loanAccountNumber, dob }) {
   try {
-    const customerDataJson = JSON.stringify(customerDataArray);
+    const customerDataJson = JSON.stringify(customerDataArray || []);
 
     const [existingUser] = await pool
       .promise()
-      .query("SELECT * FROM user_data WHERE mobile_number = ?", [mobileNumber]);
+      .query(
+        'SELECT id FROM user_data WHERE mobile_number = ?',
+        [mobileNumber]
+      );
 
     // ---------- UPDATE EXISTING USER ----------
     if (existingUser.length > 0) {
@@ -19,7 +22,8 @@ async function saveUserData({ mobileNumber, otp, customerDataArray, uid, loanAcc
           uid = ?,
           dob = ?,
           loanAccountNumber = ?,
-          otp_expiry = NOW() + INTERVAL 30 MINUTE
+          otp_expiry = NOW() + INTERVAL 30 MINUTE,
+          updated_at = NOW()
         WHERE mobile_number = ?
       `;
 
@@ -29,15 +33,10 @@ async function saveUserData({ mobileNumber, otp, customerDataArray, uid, loanAcc
         uid,
         dob || null,
         loanAccountNumber || null,
-        mobileNumber || null,
+        mobileNumber
       ];
 
-      try {
-        await pool.promise().execute(updateQuery, updateValues);
-      } catch (error) {
-        logger.error(`Error in running query of update (saveUserData) in database :: ${error}`);
-      }
-
+      await pool.promise().execute(updateQuery, updateValues);
       return;
     }
 
@@ -50,9 +49,11 @@ async function saveUserData({ mobileNumber, otp, customerDataArray, uid, loanAcc
         uid,
         loanAccountNumber,
         dob,
-        otp_expiry
+        otp_expiry,
+        created_at,
+        updated_at
       )
-      VALUES (?, ?, ?, ?, ?, ?, NOW() + INTERVAL 30 MINUTE)
+      VALUES (?, ?, ?, ?, ?, ?, NOW() + INTERVAL 30 MINUTE, NOW(), NOW())
     `;
 
     const insertValues = [
@@ -61,15 +62,17 @@ async function saveUserData({ mobileNumber, otp, customerDataArray, uid, loanAcc
       customerDataJson,
       uid,
       loanAccountNumber || null,
-      dob || null,
+      dob || null
     ];
 
     await pool.promise().execute(insertQuery, insertValues);
 
   } catch (error) {
+    logger.error(`saveUserData failed :: ${error}`);
     throw error;
   }
 }
+
 
 
 async function saveTransactionDetails({
